@@ -18,7 +18,7 @@ import torch
 from geotransformer.utils.torch import to_cuda
 
 from config import make_cfg
-from dataset import test_data_loader
+from dataset import reference_filter_manifest, test_data_loader
 from estimators import estimate_pose, select_topk_correspondences
 from metrics import (
     MetricAccumulator,
@@ -96,6 +96,7 @@ def evaluate(cfg, snapshot, methods, topks, limit, output_path):
         "protocol": dict(cfg.protocol),
         "checkpoint": osp.abspath(snapshot),
         "neighbor_limits": [int(value) for value in limits],
+        "reference_filter": reference_filter_manifest(loader.dataset.excluded_records),
         "summaries": summaries,
         "samples": rows,
     }

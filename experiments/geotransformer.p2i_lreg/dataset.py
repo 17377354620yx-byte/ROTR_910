@@ -1,6 +1,6 @@
 """P2I-LReg synthetic complete-to-partial rigid-registration adapter."""
 
-from functools import partial
+from functools import lru_cache, partial
 import hashlib
 import os
 from pathlib import Path
@@ -17,6 +17,9 @@ from geotransformer.utils.data import (
     calibrate_neighbors_stack_mode,
     registration_collate_fn_stack_mode,
 )
+
+
+_SMALL_PLY_INSPECTION_BYTES = 512
 
 
 def _normalise_root(root):
@@ -120,6 +123,67 @@ def _all_records(root, list_name):
     return records
 
 
+def _ply_vertex_count(path):
+    with open(path, "rb") as handle:
+        if handle.readline().strip() != b"ply":
+            raise ValueError(f"invalid PLY header: {path}")
+        for _ in range(256):
+            line = handle.readline()
+            if not line:
+                break
+            fields = line.strip().split()
+            if len(fields) == 3 and fields[:2] == [b"element", b"vertex"]:
+                return int(fields[2])
+            if line.strip() == b"end_header":
+                break
+    raise ValueError(f"PLY vertex count is absent: {path}")
+
+
+def filter_unusable_reference_records(root, records):
+    """Exclude released synthetic placeholders without a usable observation.
+
+    P2I-LReg represents missing synthetic observations as a one-vertex PLY at
+    the origin. The filter uses only the observed point cloud, never GT pose or
+    GT correspondences, and runs before the deterministic train/val split.
+    """
+    root = Path(root)
+    usable = []
+    excluded = []
+    for patient_id, frame_name in records:
+        path = root / patient_id / "syn" / "liverPcds" / f"{frame_name}.ply"
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        # Valid released clouds are at least several KiB. Inspect only tiny
+        # candidates so dataset construction does not read ~49k PLY headers.
+        valid = True
+        if path.stat().st_size <= _SMALL_PLY_INSPECTION_BYTES:
+            vertex_count = _ply_vertex_count(path)
+            valid = vertex_count > 0
+            if vertex_count > 0:
+                points = np.asarray(o3d.io.read_point_cloud(str(path)).points)
+                valid = len(points) > 0 and bool(np.any(points != 0.0))
+        if valid:
+            usable.append((patient_id, frame_name))
+        else:
+            excluded.append((patient_id, frame_name))
+    return usable, excluded
+
+
+def reference_filter_manifest(excluded_records):
+    return {
+        "policy": "exclude_empty_observation_without_gt",
+        "excluded_count": len(excluded_records),
+        "excluded_case_ids": [f"{patient}/{frame}" for patient, frame in excluded_records],
+    }
+
+
+@lru_cache(maxsize=4)
+def _filtered_split_records(root, list_name):
+    records = _all_records(Path(root), list_name)
+    usable, excluded = filter_unusable_reference_records(Path(root), records)
+    return tuple(usable), tuple(excluded)
+
+
 def _partition_train_records(records, validation_size, seed):
     validation_size = int(validation_size)
     if validation_size <= 0 or validation_size >= len(records):
@@ -146,13 +210,21 @@ class P2ILRegDataset(Dataset):
         self.source_surface_samples = int(cfg.data.source_surface_samples)
         train_records = None
         if split in ("train", "val"):
-            released_train = _all_records(self.root, "train_syn.txt")
+            released_train, excluded_records = _filtered_split_records(
+                str(self.root), "train_syn.txt"
+            )
             train_records, val_records = _partition_train_records(
                 released_train, cfg.data.validation_size, self.seed
             )
             self.records = train_records if split == "train" else val_records
         else:
-            self.records = _all_records(self.root, "test_syn.txt")
+            self.records, excluded_records = _filtered_split_records(
+                str(self.root), "test_syn.txt"
+            )
+            self.records = list(self.records)
+        excluded_records = list(excluded_records)
+        self.excluded_records = excluded_records
+        self.num_excluded_records = len(excluded_records)
         if limit is not None and int(limit) > 0:
             self.records = self.records[: int(limit)]
         self._source_cache = {}
@@ -201,6 +273,8 @@ class P2ILRegDataset(Dataset):
             )
         points = np.asarray(cloud.points, dtype=np.float64) / 1000.0
         points = points[~np.all(points == 0.0, axis=1)]
+        if len(points) == 0:
+            raise ValueError(f"reference has no valid nonzero points: {path}")
         return voxel_downsample(points, self.voxel_size)
 
     def __getitem__(self, index):
@@ -288,7 +362,9 @@ __all__ = [
     "P2ILRegDataset",
     "apply_transform",
     "chamfer_before_after",
+    "filter_unusable_reference_records",
     "load_source_to_reference_transform",
+    "reference_filter_manifest",
     "sample_fixed_points",
     "test_data_loader",
     "train_valid_data_loader",

@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 import numpy as np
@@ -66,6 +67,51 @@ class P2ILRegDatasetUnitTest(unittest.TestCase):
         self.assertGreater(values["ref_to_src_before_m"], 0.1)
         self.assertLess(values["ref_to_src_after_m"], 1e-10)
         self.assertLess(values["symmetric_after_m"], values["symmetric_before_m"])
+
+    def test_placeholder_reference_is_filtered_before_split(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cloud_dir = root / "01" / "syn" / "liverPcds"
+            cloud_dir.mkdir(parents=True)
+            placeholder = cloud_dir / "ptsLiverCam00001.ply"
+            placeholder.write_text(
+                "ply\n"
+                "format ascii 1.0\n"
+                "element vertex 1\n"
+                "property float x\n"
+                "property float y\n"
+                "property float z\n"
+                "end_header\n"
+                "0 0 0\n",
+                encoding="ascii",
+            )
+            valid = cloud_dir / "ptsLiverCam00002.ply"
+            valid.write_text(
+                "ply\n"
+                "format ascii 1.0\n"
+                "element vertex 2\n"
+                "property float x\n"
+                "property float y\n"
+                "property float z\n"
+                "end_header\n"
+                "0 0 0\n"
+                "1 2 3\n",
+                encoding="ascii",
+            )
+            records = [
+                ("01", "ptsLiverCam00001"),
+                ("01", "ptsLiverCam00002"),
+            ]
+
+            usable, excluded = dataset.filter_unusable_reference_records(root, records)
+
+            self.assertEqual(usable, [("01", "ptsLiverCam00002")])
+            self.assertEqual(excluded, [("01", "ptsLiverCam00001")])
+
+            manifest = dataset.reference_filter_manifest(excluded)
+            self.assertEqual(manifest["policy"], "exclude_empty_observation_without_gt")
+            self.assertEqual(manifest["excluded_count"], 1)
+            self.assertEqual(manifest["excluded_case_ids"], ["01/ptsLiverCam00001"])
 
 
 if __name__ == "__main__":

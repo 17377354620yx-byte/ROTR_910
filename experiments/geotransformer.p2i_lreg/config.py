@@ -91,6 +91,7 @@ def _base_cfg():
         selective_bf16=True,
         autocast_scope="geometric_transformer_only",
         downstream_dtype="float32",
+        invalid_reference_policy="exclude_empty_observation_without_gt",
         topk=[2000, 1500, 1000, 500, 250],
         ir_distance_threshold_m=0.01,
         fmr_inlier_ratio_threshold=0.05,

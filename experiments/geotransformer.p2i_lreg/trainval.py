@@ -18,7 +18,7 @@ import torch.optim as optim
 from geotransformer.engine import EpochBasedTrainer
 
 from config import make_cfg
-from dataset import train_valid_data_loader
+from dataset import reference_filter_manifest, train_valid_data_loader
 from loss import OverallLoss
 from model import create_model
 
@@ -64,6 +64,9 @@ class Trainer(EpochBasedTrainer):
             "geotransformer_hidden_dim": int(cfg.geotransformer.hidden_dim),
             "unit": cfg.protocol.unit,
             "transform": cfg.protocol.transform,
+            "reference_filter": reference_filter_manifest(
+                train_loader.dataset.excluded_records
+            ),
         }
         self.save_state("p2i_lreg_protocol", protocol)
         with open(osp.join(cfg.output_dir, "run_manifest.json"), "w", encoding="utf-8") as handle:

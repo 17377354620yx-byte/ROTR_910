@@ -2,7 +2,7 @@
 
 ## Material Passport
 
-- **文档状态**：第一阶段审计完成；尚未实现或运行 RTOR 的 P2I-LReg 实验。
+- **文档状态**：第一阶段审计完成；第二阶段 adapter 已实现，并补充记录发布清单中的无效 synthetic 占位帧。
 - **审计日期**：2026-09-14（Asia/Shanghai）。
 - **Self-P2IR 源码快照**：官方仓库 `main`，commit [`60d6c1b30d57148e6bc0c97fd1fab0f68cc0f079`](https://github.com/junzastar/Self-P2IR/tree/60d6c1b30d57148e6bc0c97fd1fab0f68cc0f079)（commit 时间 2025-12-04）。
 - **论文来源**：[arXiv:2504.15152](https://arxiv.org/abs/2504.15152)，*Landmark-Free Preoperative-to-Intraoperative Registration in Laparoscopic Liver Resection*, IEEE TMI 2025。
@@ -170,6 +170,13 @@ target = R_gt @ source + t_gt
 1. synthetic scale augmentation 会令 `pose_R` 不再属于 SO(3)，与论文所称 SE(3) rigid GT 冲突。它不能无说明地进入严格 rigid-only 主协议。
 2. 若 synthetic 样本在 `0.0065 m` 半径下少于 1,000 个 input-level correspondence，`__getitem__` 即使在 test 模式也随机换成其他样本。这会造成困难样本被替换、重复样本和指标分母错误。SCI 评估 adapter 应 fail/warn 并保留 case/frame identity，不得静默换样本。
 
+发布数据全量检查还发现：`train_syn.txt` 中 142 帧、`test_syn.txt` 中
+6 帧对应的 PLY 仅含一个 `(0,0,0)` 占位点，按发布预处理去除零点后没有
+任何可配准观测。Self-P2IR 会先补成全零 target，随后因 GT correspondence
+不足而随机换样本。`released_corrected_v1` 在 train/val 划分前仅依据观测点云
+内容确定性排除这些帧，不使用 GT pose 或 GT correspondence；排除 case ID 写入
+每次 run manifest。
+
 此外，YAML 中 `augment_noise: 0.005` 未被 dataset 使用；dataset 构造函数把它硬编码为 `0.002`。
 
 ## 7. Voxel size 与 Input points：paper vs code
@@ -193,6 +200,10 @@ target = R_gt @ source + t_gt
 | `07`–`20` | 每人 2,350 | 每人 150 |
 | `21` | 1,900 | 100 |
 | **总计** | **46,200** | **2,800** |
+
+上述是发布文本清单的名义计数。排除无观测占位帧后的有效计数为：原 train
+清单 46,058、原 test 清单 2,794；本实验再从 46,058 中固定划出 500 个
+validation，因此实际为 45,558 train / 500 val / 2,794 test。
 
 - 每个患者 train/test 无重叠。
 - 没有 `val_syn.txt`。发布 `get_datasets()` 令 `val_set = test_set`，即 validation 与 test 完全相同。
