@@ -1,0 +1,115 @@
+"""Configuration for rigid complete-to-partial liver registration."""
+
+import copy
+import os
+import os.path as osp
+import sys
+
+
+_ROOT_DIR = osp.realpath(osp.join(osp.dirname(__file__), '..', '..'))
+if _ROOT_DIR in sys.path:
+    sys.path.remove(_ROOT_DIR)
+sys.path.insert(0, _ROOT_DIR)
+
+from geotransformer.config import make_rtor_a3_cfg
+from geotransformer.utils.common import ensure_dir
+
+_C = make_rtor_a3_cfg()
+_C.working_dir = osp.dirname(osp.realpath(__file__))
+_C.root_dir = _ROOT_DIR
+_RUN_NAME = os.environ.get('P2P_RUN_NAME', 'rtor_a3').strip()
+if not _RUN_NAME:
+    raise ValueError('P2P_RUN_NAME must not be empty')
+_C.exp_name = f'geotransformer.p2p_liver.{_RUN_NAME}'
+_C.output_dir = osp.join(_C.root_dir, 'output', _C.exp_name)
+_C.snapshot_dir = osp.join(_C.output_dir, 'snapshots')
+_C.log_dir = osp.join(_C.output_dir, 'logs')
+_C.event_dir = osp.join(_C.output_dir, 'events')
+_C.feature_dir = osp.join(_C.output_dir, 'features')
+_C.registration_dir = osp.join(_C.output_dir, 'registration')
+
+_DATA_ROOT = os.environ.get('P2P_DATA_ROOT', '/mnt/data3/yangx/P2P/Dataset')
+_C.data.train_root = osp.join(_DATA_ROOT, 'Deform_mesh_npz')
+_C.data.train_list = osp.join(_C.data.train_root, 'dict.json')
+_C.data.test_root = osp.join(_DATA_ROOT, 'Deform_mesh_npz_test', 'Test')
+_C.data.test_list = osp.join(_DATA_ROOT, 'Deform_mesh_npz_test', 'list.npz')
+_C.data.statistics = osp.join(
+    _DATA_ROOT,
+    'Deform_mesh_npz_test',
+    'stat_svd.npz',
+)
+_C.data.in_vitro_root = os.environ.get(
+    'P2P_IN_VITRO_ROOT',
+    '/mnt/data3/yangx/P2P/in_vitro',
+)
+_C.data.in_vitro_list = osp.join(_C.data.in_vitro_root, 'rigid_list.npy')
+_C.data.in_vitro_statistics = osp.join(_C.data.in_vitro_root, 'stat.npz')
+_C.data.voxel_size = 0.04
+_C.data.min_visibility = 0.18
+_C.data.max_visibility = 1.0
+_C.data.max_noise_mm = 5.0
+_C.data.validation_size = 100
+_C.data.validation_fraction = 0.1
+_C.data.neighbor_calibration_samples = 2000
+_C.data.neighbor_limits = None
+
+_C.backbone.init_voxel_size = 0.02
+_C.backbone.init_radius = _C.backbone.base_radius * _C.backbone.init_voxel_size
+_C.backbone.init_sigma = _C.backbone.base_sigma * _C.backbone.init_voxel_size
+_C.model.ground_truth_matching_radius = 0.04
+_C.fine_loss.positive_radius = 0.04
+
+
+def make_cfg(architecture='rtor_a3', registration_profile='legacy', dual_encoder=False, interaction_profile='legacy'):
+    """Return a fresh P2P RTOR+A3 configuration."""
+    cfg = copy.deepcopy(_C)
+    choices = {'geotransformer': (False, False), 'rtor_only': (True, False),
+               'a3_only': (False, True), 'rtor_a3': (True, True)}
+    if architecture not in choices:
+        raise ValueError(f'Unknown architecture: {architecture}')
+    cfg.ablation.architecture = architecture
+    cfg.ablation.rtor_enabled, cfg.ablation.a3_enabled = choices[architecture]
+    if registration_profile not in ('legacy', 'tight', 'robust'):
+        raise ValueError(f'Unknown registration profile: {registration_profile}')
+    cfg.model.registration_profile = registration_profile
+    cfg.model.dual_encoder = bool(dual_encoder)
+    if interaction_profile not in ('legacy', 'cooperative', 'soft_overlap'):
+        raise ValueError(f'Unknown interaction profile: {interaction_profile}')
+    if interaction_profile == 'cooperative' and (architecture != 'rtor_a3' or dual_encoder or registration_profile != 'legacy'):
+        raise ValueError('Cooperative profile uses single-encoder RTOR+A3 and the original LGR settings')
+    cfg.model.interaction_profile = interaction_profile
+    cfg.coarse_matching.predicted_ratio_max = .25 if interaction_profile == 'cooperative' else 0.
+    cfg.coarse_matching.exposure_start_epoch = 5
+    cfg.coarse_matching.exposure_end_epoch = 20
+    # Keep historical loss weights by default: checkpoint probes did not show
+    # sustained gradient conflict or an over-dominant overlap objective.
+    if interaction_profile in ('cooperative', 'soft_overlap'):
+        cfg.overlap_selection.enabled = False
+    if registration_profile == 'tight':
+        cfg.fine_matching.acceptance_radius = 0.06
+    elif registration_profile == 'robust':
+        cfg.fine_matching.robust_refinement_radius = 0.04
+    default_name = architecture + ('_dual' if dual_encoder else '')
+    if interaction_profile != 'legacy':
+        default_name += '_' + interaction_profile
+    if registration_profile != 'legacy':
+        default_name += '_' + registration_profile
+    run_name = os.environ.get('P2P_RUN_NAME', default_name).strip()
+    if not run_name or '/' in run_name or '\\' in run_name or run_name in ('.', '..'):
+        raise ValueError('P2P_RUN_NAME must be a nonempty directory name')
+    cfg.exp_name = f'geotransformer.p2p_liver.{run_name}'
+    cfg.output_dir = osp.join(cfg.root_dir, 'output', cfg.exp_name)
+    for key, folder in (('snapshot_dir', 'snapshots'), ('log_dir', 'logs'),
+                        ('event_dir', 'events'), ('feature_dir', 'features'),
+                        ('registration_dir', 'registration')):
+        cfg[key] = osp.join(cfg.output_dir, folder)
+    for path in (
+        cfg.output_dir,
+        cfg.snapshot_dir,
+        cfg.log_dir,
+        cfg.event_dir,
+        cfg.feature_dir,
+        cfg.registration_dir,
+    ):
+        ensure_dir(path)
+    return cfg

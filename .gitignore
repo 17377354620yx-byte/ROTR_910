@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Conda / virtual env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs / outputs
+*.log
+outputs/
+output/
+results/
+checkpoints/
+snapshots/
+
+# Model weights
+*.pth
+*.pth.tar
+*.pt
+*.ckpt
+
+# Dataset / large files
+data/
+datasets/
+
+# Temporary files
+*.tmp
+*.swp
+.DS_Store

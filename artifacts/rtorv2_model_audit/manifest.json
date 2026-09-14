@@ -1,0 +1,129 @@
+{
+  "schema": "rtorv2-sci-evidence/1.0",
+  "bootstrap_repetitions": 10000,
+  "random_seed": 7351,
+  "paired_difference_direction": "candidate_minus_geotransformer",
+  "multiple_testing": "Holm adjustment across all baseline comparisons",
+  "inputs": [
+    {
+      "condition": "In-silico, no added noise",
+      "method": "GeoTransformer",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.geotransformer.seed7351/evaluation_epoch150/in_silico_noise_none.json",
+      "sha256": "351cbb5b45d7ae4a914f9afcc811bf009ec67e460a54b9ed3c40aa672068d5ab"
+    },
+    {
+      "condition": "In-silico, no added noise",
+      "method": "RTOR",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_only.seed7351/evaluation_epoch150/in_silico_noise_none.json",
+      "sha256": "7503e7fb5214b6f1d45902f45aa4639cd510ce538a05882903e1e194e52316a8"
+    },
+    {
+      "condition": "In-silico, no added noise",
+      "method": "A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.a3_only.seed7351/evaluation_epoch150/in_silico_noise_none.json",
+      "sha256": "2fd01080782afa32939ff85c843958d5a174e82d0be1da34a0b9fa500c851298"
+    },
+    {
+      "condition": "In-silico, no added noise",
+      "method": "RTOR+A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_a3.seed7351/evaluation_epoch150/in_silico_noise_none.json",
+      "sha256": "6932d9892a1479242bbd657fdcb35f0b5e6ffa03aa0499bd583a834674934bb0"
+    },
+    {
+      "condition": "In-silico, no added noise",
+      "method": "RTOR+A3 (cooperative)",
+      "path": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative_v1_epoch150/in_silico_noise_none.json",
+      "sha256": "ce8751007127dda908f744ce935691544dc822f2f4ec70dea188b42c6c53abea"
+    },
+    {
+      "condition": "In-silico, 2 mm noise",
+      "method": "GeoTransformer",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.geotransformer.seed7351/evaluation_epoch150/in_silico_noise_2.json",
+      "sha256": "64468462d5ca0fd1bf723c32363b77ea2ce8b82a569f550067292d1704fff79a"
+    },
+    {
+      "condition": "In-silico, 2 mm noise",
+      "method": "RTOR",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_only.seed7351/evaluation_epoch150/in_silico_noise_2.json",
+      "sha256": "bbcd406da0b9158b95b74348a0f3995fcc46648e460f31c1966ea944fc631799"
+    },
+    {
+      "condition": "In-silico, 2 mm noise",
+      "method": "A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.a3_only.seed7351/evaluation_epoch150/in_silico_noise_2.json",
+      "sha256": "029029d7269c73869600ab92d2c4a66611e59f5238c5d8ba1237fbb101bd553d"
+    },
+    {
+      "condition": "In-silico, 2 mm noise",
+      "method": "RTOR+A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_a3.seed7351/evaluation_epoch150/in_silico_noise_2.json",
+      "sha256": "515757c44cbb1cb9ace4990361f35d7b0621a343776ff3623f1c4c5454e9d8d7"
+    },
+    {
+      "condition": "In-silico, 2 mm noise",
+      "method": "RTOR+A3 (cooperative)",
+      "path": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative_v1_epoch150/in_silico_noise_2.json",
+      "sha256": "5d856b54d58d3d889ebf7a3ba2c30c39fbc4f931cd5522ad8913e22e3b6043d0"
+    },
+    {
+      "condition": "In-silico, 4 mm noise",
+      "method": "GeoTransformer",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.geotransformer.seed7351/evaluation_epoch150/in_silico_noise_4.json",
+      "sha256": "4dbef5fff9fe0c4d7cb9c9b811082eafea886f9eeb68946587fafdffa8e4d622"
+    },
+    {
+      "condition": "In-silico, 4 mm noise",
+      "method": "RTOR",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_only.seed7351/evaluation_epoch150/in_silico_noise_4.json",
+      "sha256": "a009dcfe902e6dae49bbec18479518a81b1697d0150a4db40bf55242c51dfe1e"
+    },
+    {
+      "condition": "In-silico, 4 mm noise",
+      "method": "A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.a3_only.seed7351/evaluation_epoch150/in_silico_noise_4.json",
+      "sha256": "0f9439974bee3f54d104667bf0aeb68d3ce8c06ad890705da79e971e88dafe38"
+    },
+    {
+      "condition": "In-silico, 4 mm noise",
+      "method": "RTOR+A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_a3.seed7351/evaluation_epoch150/in_silico_noise_4.json",
+      "sha256": "a4fdfcaef29f278a67ff41f01013c0f2b977409c4de332b9855cdbc03c9ccfd2"
+    },
+    {
+      "condition": "In-silico, 4 mm noise",
+      "method": "RTOR+A3 (cooperative)",
+      "path": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative_v1_epoch150/in_silico_noise_4.json",
+      "sha256": "88a98d743b8586f3f22773dfb46ad456a4424c770a719972d64c79fe1e145e6d"
+    },
+    {
+      "condition": "In-vitro phantom",
+      "method": "GeoTransformer",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.geotransformer.seed7351/evaluation_epoch150/in_vitro_noise_none.json",
+      "sha256": "a2c757142470a025542500407a2281e902d2380f0c6ac858bab5959b185064a5"
+    },
+    {
+      "condition": "In-vitro phantom",
+      "method": "RTOR",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_only.seed7351/evaluation_epoch150/in_vitro_noise_none.json",
+      "sha256": "1b48f0b97edf82db660e81f766a59c57d8ff22f3c8cf1c428b3a035811027734"
+    },
+    {
+      "condition": "In-vitro phantom",
+      "method": "A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.a3_only.seed7351/evaluation_epoch150/in_vitro_noise_none.json",
+      "sha256": "8577820b6bd9d7d53ab2c46fc8b2701817caaf1cfd3e7c26e45af2a7f50ba4c5"
+    },
+    {
+      "condition": "In-vitro phantom",
+      "method": "RTOR+A3",
+      "path": "/home/yangx/code/new_deform/RTORv6/output/geotransformer.p2p_liver.ablation.scratch_v2.rtor_a3.seed7351/evaluation_epoch150/in_vitro_noise_none.json",
+      "sha256": "a7884f5f5ed227a9f7d1350619e825c3254223686095f1a902120c8142bf192e"
+    },
+    {
+      "condition": "In-vitro phantom",
+      "method": "RTOR+A3 (cooperative)",
+      "path": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative_v1_epoch150/in_vitro.json",
+      "sha256": "bec141d0fdbf663814da755257e304f3f92c568d63ebd074cad30751a808e464"
+    }
+  ]
+}
