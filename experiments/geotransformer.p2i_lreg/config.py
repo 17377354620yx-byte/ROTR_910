@@ -58,6 +58,13 @@ def _base_cfg():
     cfg.optim.max_epoch = 120
     cfg.optim.grad_acc_steps = 2
 
+    # Restrict BF16 autocast to the geometric-transformer core. RTOR,
+    # correspondence losses and rigid pose solvers remain in FP32.
+    cfg.precision = dict(
+        selective_bf16=True,
+        autocast_dtype="bfloat16",
+    )
+
     cfg.backbone.init_voxel_size = 0.001
     cfg.backbone.init_radius = cfg.backbone.base_radius * cfg.backbone.init_voxel_size
     cfg.backbone.init_sigma = cfg.backbone.base_sigma * cfg.backbone.init_voxel_size
@@ -81,6 +88,9 @@ def _base_cfg():
         voxel_size_m=0.001,
         geotransformer_angle_k=1,
         geotransformer_hidden_dim=128,
+        selective_bf16=True,
+        autocast_scope="geometric_transformer_only",
+        downstream_dtype="float32",
         topk=[2000, 1500, 1000, 500, 250],
         ir_distance_threshold_m=0.01,
         fmr_inlier_ratio_threshold=0.05,

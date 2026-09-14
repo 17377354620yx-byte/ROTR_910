@@ -37,6 +37,8 @@ class GeoTransformer(nn.Module):
         self.matching_radius = float(cfg.model.ground_truth_matching_radius)
         self.rtor_enabled = bool(cfg.ablation.rtor_enabled)
         self.a3_enabled = bool(cfg.ablation.a3_enabled)
+        precision_cfg = cfg.get('precision', {})
+        self.selective_bf16 = bool(precision_cfg.get('selective_bf16', False))
         self.predicted_coarse_ratio = 0.0
 
         self.backbone = KPConvFPN(
@@ -118,12 +120,22 @@ class GeoTransformer(nn.Module):
         ref_feats_c,
         src_feats_c,
     ):
-        ref_feats_c, src_feats_c = self.transformer(
-            ref_points_c.unsqueeze(0),
-            src_points_c.unsqueeze(0),
-            ref_feats_c.unsqueeze(0),
-            src_feats_c.unsqueeze(0),
-        )
+        device_type = ref_feats_c.device.type
+        autocast_enabled = self.selective_bf16 and device_type in ('cuda', 'cpu')
+        with torch.autocast(
+            device_type=device_type,
+            dtype=torch.bfloat16,
+            enabled=autocast_enabled,
+        ):
+            ref_feats_c, src_feats_c = self.transformer(
+                ref_points_c.unsqueeze(0),
+                src_points_c.unsqueeze(0),
+                ref_feats_c.unsqueeze(0),
+                src_feats_c.unsqueeze(0),
+            )
+        # Keep all RTOR, matching, loss and pose-estimation operations in FP32.
+        ref_feats_c = ref_feats_c.float()
+        src_feats_c = src_feats_c.float()
         ref_feats_c = F.normalize(ref_feats_c.squeeze(0), p=2, dim=1)
         src_feats_c = F.normalize(src_feats_c.squeeze(0), p=2, dim=1)
         return ref_feats_c, src_feats_c

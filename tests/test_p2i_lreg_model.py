@@ -29,6 +29,21 @@ class _Recorder(torch.nn.Module):
         return {"ok": True}
 
 
+class _AutocastProbe(torch.nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.proj = torch.nn.Linear(channels, channels, bias=False)
+        self.autocast_enabled = None
+        self.output_dtype = None
+
+    def forward(self, ref_points, src_points, ref_feats, src_feats):
+        self.autocast_enabled = torch.is_autocast_enabled(ref_feats.device.type)
+        ref_output = self.proj(ref_feats)
+        src_output = self.proj(src_feats)
+        self.output_dtype = ref_output.dtype
+        return ref_output, src_output
+
+
 class P2ILRegModelTest(unittest.TestCase):
     def test_architecture_switches_exactly_requested_modules(self):
         baseline = model_entry.create_model(config.make_cfg("geotransformer", create_dirs=False))
@@ -51,6 +66,24 @@ class P2ILRegModelTest(unittest.TestCase):
         self.assertEqual(cfg.train.batch_size, 1)
         self.assertEqual(cfg.optim.grad_acc_steps, 2)
         self.assertEqual(cfg.protocol.effective_batch_size, 2)
+
+    def test_selective_bf16_is_confined_to_geometric_transformer(self):
+        cfg = config.make_cfg("rtor", create_dirs=False)
+        self.assertTrue(cfg.precision.selective_bf16)
+        model = model_entry.create_model(cfg)
+        probe = _AutocastProbe(cfg.geotransformer.input_dim)
+        model.transformer = probe
+        points = torch.randn(1, 6, 3)
+        features = torch.randn(1, 6, cfg.geotransformer.input_dim)
+
+        ref_features, src_features = model._encode_coarse_features(
+            points, points, features, features
+        )
+
+        self.assertTrue(probe.autocast_enabled)
+        self.assertEqual(probe.output_dtype, torch.bfloat16)
+        self.assertEqual(ref_features.dtype, torch.float32)
+        self.assertEqual(src_features.dtype, torch.float32)
 
 
 if __name__ == "__main__":
