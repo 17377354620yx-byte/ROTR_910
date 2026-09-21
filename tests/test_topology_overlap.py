@@ -42,6 +42,45 @@ def test_refiner_is_neutral_and_finite_at_initialization():
     torch.testing.assert_close(diagnostics["src_overlap_logits"], torch.zeros(17))
 
 
+def test_refiner_without_poincare_uses_four_edge_features():
+    torch.manual_seed(29)
+    module = TopologyOverlapRefiner(
+        feature_dim=8,
+        hidden_dim=10,
+        num_neighbors=3,
+        dropout=0.0,
+        use_poincare=False,
+    ).eval()
+    assert module.edge_gate[0].in_features == 4
+    output = module(
+        torch.randn(9, 3),
+        torch.randn(13, 3),
+        torch.randn(9, 8),
+        torch.randn(13, 8),
+    )
+    assert all(torch.isfinite(value).all() for value in output[:2])
+    assert all(torch.isfinite(value).all() for value in output[2].values())
+
+
+def test_refiner_without_descriptor_update_has_no_projection_parameters():
+    torch.manual_seed(31)
+    module = TopologyOverlapRefiner(
+        feature_dim=8,
+        hidden_dim=10,
+        num_neighbors=3,
+        dropout=0.0,
+        refine_descriptors=False,
+    ).eval()
+    assert module.output_proj is None
+    ref_features = torch.randn(9, 8)
+    src_features = torch.randn(13, 8)
+    ref_output, src_output, _ = module(
+        torch.randn(9, 3), torch.randn(13, 3), ref_features, src_features
+    )
+    torch.testing.assert_close(ref_output, ref_features)
+    torch.testing.assert_close(src_output, src_features)
+
+
 def test_rtor_outputs_are_rigid_invariant():
     torch.manual_seed(11)
     module = TopologyOverlapRefiner(

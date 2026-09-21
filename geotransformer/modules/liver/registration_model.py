@@ -37,6 +37,9 @@ class GeoTransformer(nn.Module):
         self.matching_radius = float(cfg.model.ground_truth_matching_radius)
         self.rtor_enabled = bool(cfg.ablation.rtor_enabled)
         self.a3_enabled = bool(cfg.ablation.a3_enabled)
+        self.overlap_soft_weight = bool(
+            cfg.ablation.get('overlap_soft_weight', True)
+        )
         precision_cfg = cfg.get('precision', {})
         self.selective_bf16 = bool(precision_cfg.get('selective_bf16', False))
         self.predicted_coarse_ratio = 0.0
@@ -95,6 +98,7 @@ class GeoTransformer(nn.Module):
             geometry_sigma=cfg.fine_refiner.geometry_sigma,
             geometry_weight=cfg.fine_refiner.geometry_weight,
             residual_init=cfg.fine_refiner.residual_init,
+            use_geometry_bias=cfg.ablation.get('a3_geometry_bias', True),
         ) if self.a3_enabled else None
         self.topology_overlap_refiner = TopologyOverlapRefiner(
             feature_dim=cfg.geotransformer.output_dim,
@@ -102,6 +106,10 @@ class GeoTransformer(nn.Module):
             num_neighbors=cfg.topology_overlap.num_neighbors,
             poincare_curvature=cfg.topology_overlap.poincare_curvature,
             dropout=cfg.topology_overlap.dropout,
+            use_poincare=cfg.ablation.get('rtor_poincare', True),
+            refine_descriptors=cfg.ablation.get(
+                'rtor_descriptor_update', True
+            ),
         ) if self.rtor_enabled else None
 
         self.overlap_score_floor = float(cfg.topology_overlap.score_floor)
@@ -168,12 +176,16 @@ class GeoTransformer(nn.Module):
         src_feats_c = F.normalize(src_feats_c, p=2, dim=1)
         ref_probability = torch.sigmoid(diagnostics['ref_overlap_logits'])
         src_probability = torch.sigmoid(diagnostics['src_overlap_logits'])
-        ref_weight = self.overlap_score_floor + (
-            1.0 - self.overlap_score_floor
-        ) * ref_probability.pow(self.overlap_score_power)
-        src_weight = self.overlap_score_floor + (
-            1.0 - self.overlap_score_floor
-        ) * src_probability.pow(self.overlap_score_power)
+        if self.overlap_soft_weight:
+            ref_weight = self.overlap_score_floor + (
+                1.0 - self.overlap_score_floor
+            ) * ref_probability.pow(self.overlap_score_power)
+            src_weight = self.overlap_score_floor + (
+                1.0 - self.overlap_score_floor
+            ) * src_probability.pow(self.overlap_score_power)
+        else:
+            ref_weight = torch.ones_like(ref_probability)
+            src_weight = torch.ones_like(src_probability)
         return (
             ref_feats_c,
             src_feats_c,

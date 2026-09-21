@@ -127,6 +127,7 @@ class GeometryAwareFineRefiner(nn.Module):
         geometry_sigma: float = 0.25,
         geometry_weight: float = 1.0,
         residual_init: float = 0.0,
+        use_geometry_bias: bool = True,
     ) -> None:
         super().__init__()
         if geometry_sigma <= 0:
@@ -135,6 +136,7 @@ class GeometryAwareFineRefiner(nn.Module):
         self.feature_dim = int(feature_dim)
         self.geometry_sigma = float(geometry_sigma)
         self.geometry_weight = float(geometry_weight)
+        self.use_geometry_bias = bool(use_geometry_bias)
         self.layers = nn.ModuleList(
             [
                 LocalInteractionBlock(
@@ -231,9 +233,16 @@ class GeometryAwareFineRefiner(nn.Module):
                 f"Expected {self.feature_dim}D features, got {ref_features.shape[-1]}"
             )
 
-        geometry_bias = self._cross_geometry_bias(
-            ref_points, src_points, ref_masks, src_masks
-        )
+        if self.use_geometry_bias:
+            geometry_bias = self._cross_geometry_bias(
+                ref_points, src_points, ref_masks, src_masks
+            )
+        else:
+            geometry_bias = ref_features.new_zeros(
+                ref_features.shape[0],
+                ref_features.shape[1],
+                src_features.shape[1],
+            )
         ref_features = ref_features * ref_masks[..., None].to(ref_features.dtype)
         src_features = src_features * src_masks[..., None].to(src_features.dtype)
         old_ref, old_src = ref_features, src_features

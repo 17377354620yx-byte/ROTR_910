@@ -26,6 +26,8 @@ class TopologyOverlapRefiner(nn.Module):
         num_neighbors: int = 8,
         poincare_curvature: float = 1.0,
         dropout: float = 0.0,
+        use_poincare: bool = True,
+        refine_descriptors: bool = True,
     ) -> None:
         super().__init__()
         if feature_dim <= 0 or hidden_dim <= 0:
@@ -38,11 +40,14 @@ class TopologyOverlapRefiner(nn.Module):
         self.hidden_dim = int(hidden_dim)
         self.num_neighbors = int(num_neighbors)
         self.poincare_curvature = float(poincare_curvature)
+        self.use_poincare = bool(use_poincare)
+        self.refine_descriptors = bool(refine_descriptors)
 
         self.input_proj = nn.Linear(self.feature_dim, self.hidden_dim)
         # normalized distance, curvature, linearity, planarity, Poincare distance
+        edge_feature_dim = 5 if self.use_poincare else 4
         self.edge_gate = nn.Sequential(
-            nn.Linear(5, self.hidden_dim),
+            nn.Linear(edge_feature_dim, self.hidden_dim),
             nn.ReLU(inplace=True),
             nn.Linear(self.hidden_dim, 1),
         )
@@ -67,11 +72,16 @@ class TopologyOverlapRefiner(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(self.hidden_dim, 1),
         )
-        self.output_proj = nn.Linear(self.hidden_dim, self.feature_dim)
+        self.output_proj = (
+            nn.Linear(self.hidden_dim, self.feature_dim)
+            if self.refine_descriptors
+            else None
+        )
 
         # Old descriptors and a uniform overlap prior are reproduced at step 0.
-        nn.init.zeros_(self.output_proj.weight)
-        nn.init.zeros_(self.output_proj.bias)
+        if self.output_proj is not None:
+            nn.init.zeros_(self.output_proj.weight)
+            nn.init.zeros_(self.output_proj.bias)
         nn.init.zeros_(self.overlap_head[-1].weight)
         nn.init.zeros_(self.overlap_head[-1].bias)
 
@@ -134,20 +144,19 @@ class TopologyOverlapRefiner(nn.Module):
             points, self.num_neighbors
         )
         neighbour_hidden = _gather_rows(hidden, indices)
-        poincare = self._poincare_map(F.normalize(hidden, p=2, dim=-1))
-        neighbour_poincare = _gather_rows(poincare, indices)
-        hyperbolic_distance = self._poincare_distance(
-            poincare, neighbour_poincare
-        )
         neighbour_geometry = _gather_rows(geometry, indices)
-        edge_geometry = torch.cat(
-            [
-                relative_distances[..., None],
-                geometry[:, None, :].expand_as(neighbour_geometry),
-                hyperbolic_distance[..., None],
-            ],
-            dim=-1,
-        )
+        edge_features = [
+            relative_distances[..., None],
+            geometry[:, None, :].expand_as(neighbour_geometry),
+        ]
+        if self.use_poincare:
+            poincare = self._poincare_map(F.normalize(hidden, p=2, dim=-1))
+            neighbour_poincare = _gather_rows(poincare, indices)
+            hyperbolic_distance = self._poincare_distance(
+                poincare, neighbour_poincare
+            )
+            edge_features.append(hyperbolic_distance[..., None])
+        edge_geometry = torch.cat(edge_features, dim=-1)
         weights = torch.softmax(self.edge_gate(edge_geometry).squeeze(-1), dim=1)
         message = (weights[..., None] * neighbour_hidden).sum(dim=1)
         update = self.graph_update(torch.cat([hidden, message, geometry], dim=-1))
@@ -228,8 +237,9 @@ class TopologyOverlapRefiner(nn.Module):
             "ref_overlap_logits": ref_logits,
             "src_overlap_logits": src_logits,
         }
-        return (
-            ref_features + self.output_proj(ref_hidden),
-            src_features + self.output_proj(src_hidden),
-            overlap_output,
-        )
+        if self.output_proj is None:
+            ref_output, src_output = ref_features, src_features
+        else:
+            ref_output = ref_features + self.output_proj(ref_hidden)
+            src_output = src_features + self.output_proj(src_hidden)
+        return ref_output, src_output, overlap_output

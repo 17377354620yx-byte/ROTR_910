@@ -60,7 +60,47 @@ _C.model.ground_truth_matching_radius = 0.04
 _C.fine_loss.positive_radius = 0.04
 
 
-def make_cfg(architecture='rtor_a3', registration_profile='legacy', dual_encoder=False, interaction_profile='legacy'):
+ABLATION_PROFILES = {
+    'abl1_no_proposal': (False, True, True, True, True),
+    'abl2_no_soft_weight': (False, False, True, True, True),
+    'abl3_no_poincare': (False, False, False, True, True),
+    'abl4_no_a3_geometry': (False, False, False, False, True),
+    'abl5_no_rtor_descriptor': (False, False, False, False, False),
+    # Compact candidate selected after the cumulative ablation study. Keep
+    # overlap weighting and descriptor update; remove proposal exposure and
+    # the two geometry branches.
+    'compact_no_proposal_poincare_geometry': (False, True, False, False, True),
+}
+
+
+def _configure_ablation(cfg, ablation_profile):
+    if ablation_profile == 'none':
+        switches = (True, True, True, True, True)
+    else:
+        try:
+            switches = ABLATION_PROFILES[ablation_profile]
+        except KeyError as error:
+            choices = ', '.join(('none', *ABLATION_PROFILES))
+            raise ValueError(
+                f'Unknown ablation profile: {ablation_profile}; choose from {choices}'
+            ) from error
+    cfg.ablation.profile = ablation_profile
+    (
+        cfg.ablation.predicted_proposal_exposure,
+        cfg.ablation.overlap_soft_weight,
+        cfg.ablation.rtor_poincare,
+        cfg.ablation.a3_geometry_bias,
+        cfg.ablation.rtor_descriptor_update,
+    ) = switches
+
+
+def make_cfg(
+    architecture='rtor_a3',
+    registration_profile='legacy',
+    dual_encoder=False,
+    interaction_profile='legacy',
+    ablation_profile='none',
+):
     """Return a fresh P2P RTOR+A3 configuration."""
     cfg = copy.deepcopy(_C)
     choices = {'geotransformer': (False, False), 'rtor_only': (True, False),
@@ -75,10 +115,26 @@ def make_cfg(architecture='rtor_a3', registration_profile='legacy', dual_encoder
     cfg.model.dual_encoder = bool(dual_encoder)
     if interaction_profile not in ('legacy', 'cooperative', 'soft_overlap'):
         raise ValueError(f'Unknown interaction profile: {interaction_profile}')
+    _configure_ablation(cfg, ablation_profile)
+    if ablation_profile != 'none' and (
+        architecture != 'rtor_a3'
+        or interaction_profile != 'cooperative'
+        or dual_encoder
+        or registration_profile != 'legacy'
+    ):
+        raise ValueError(
+            'Ablation profiles require single-encoder RTOR+A3 with '
+            'interaction_profile=cooperative and registration_profile=legacy'
+        )
     if interaction_profile == 'cooperative' and (architecture != 'rtor_a3' or dual_encoder or registration_profile != 'legacy'):
         raise ValueError('Cooperative profile uses single-encoder RTOR+A3 and the original LGR settings')
     cfg.model.interaction_profile = interaction_profile
-    cfg.coarse_matching.predicted_ratio_max = .25 if interaction_profile == 'cooperative' else 0.
+    cfg.coarse_matching.predicted_ratio_max = (
+        .25
+        if interaction_profile == 'cooperative'
+        and cfg.ablation.predicted_proposal_exposure
+        else 0.
+    )
     cfg.coarse_matching.exposure_start_epoch = 5
     cfg.coarse_matching.exposure_end_epoch = 20
     # Keep historical loss weights by default: checkpoint probes did not show
@@ -92,6 +148,8 @@ def make_cfg(architecture='rtor_a3', registration_profile='legacy', dual_encoder
     default_name = architecture + ('_dual' if dual_encoder else '')
     if interaction_profile != 'legacy':
         default_name += '_' + interaction_profile
+    if ablation_profile != 'none':
+        default_name += '_' + ablation_profile
     if registration_profile != 'legacy':
         default_name += '_' + registration_profile
     run_name = os.environ.get('P2P_RUN_NAME', default_name).strip()
@@ -113,3 +171,6 @@ def make_cfg(architecture='rtor_a3', registration_profile='legacy', dual_encoder
     ):
         ensure_dir(path)
     return cfg
+
+
+__all__ = ['ABLATION_PROFILES', 'make_cfg']

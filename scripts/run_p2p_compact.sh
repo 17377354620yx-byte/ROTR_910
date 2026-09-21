@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+P2P_PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$P2P_PROJECT_ROOT"
+
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-4}"
+
+P2P_CONDA_ENV="${P2P_CONDA_ENV:-geo_py310}"
+P2P_CHECKPOINT_NAME="${P2P_CHECKPOINT_NAME:-epoch-150.pth.tar}"
+PROFILE="compact_no_proposal_poincare_geometry"
+RUN_NAME="rtor_a3_cooperative_${PROFILE}_seed7351"
+RUN_DIR="output/geotransformer.p2p_liver.${RUN_NAME}"
+
+usage() {
+  cat <<'EOF'
+Usage: bash scripts/run_p2p_compact.sh train|test|all [TRAIN_ARGS...]
+
+Examples:
+  bash scripts/run_p2p_compact.sh all
+  bash scripts/run_p2p_compact.sh train
+  bash scripts/run_p2p_compact.sh train --resume
+  bash scripts/run_p2p_compact.sh test
+EOF
+}
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+action="$1"
+shift
+train_args=("$@")
+if [[ "$action" != "train" && "$action" != "test" && "$action" != "all" ]]; then
+  usage >&2
+  exit 2
+fi
+
+train_model() {
+  echo "[train] profile=${PROFILE} run=${RUN_NAME} gpu=${CUDA_VISIBLE_DEVICES}"
+  P2P_RUN_NAME="$RUN_NAME" conda run --no-capture-output -n "$P2P_CONDA_ENV" \
+    python experiments/geotransformer.p2p_liver/trainval.py \
+    --architecture rtor_a3 \
+    --interaction_profile cooperative \
+    --ablation_profile "$PROFILE" \
+    --max_epoch 150 \
+    --lr 1e-4 \
+    --log_steps 10 \
+    "${train_args[@]}"
+}
+
+test_model() {
+  local checkpoint="${RUN_DIR}/snapshots/${P2P_CHECKPOINT_NAME}"
+  local result_dir="${RUN_DIR}/evaluation_epoch150"
+  if [[ ! -f "$checkpoint" ]]; then
+    echo "Missing trained checkpoint: $checkpoint" >&2
+    exit 1
+  fi
+  mkdir -p "$result_dir"
+  echo "[test] profile=${PROFILE} checkpoint=${checkpoint} gpu=${CUDA_VISIBLE_DEVICES}"
+  for noise in none 2 4; do
+    P2P_RUN_NAME="$RUN_NAME" conda run --no-capture-output -n "$P2P_CONDA_ENV" \
+      python experiments/geotransformer.p2p_liver/test.py \
+      --architecture rtor_a3 \
+      --interaction_profile cooperative \
+      --ablation_profile "$PROFILE" \
+      --snapshot "$checkpoint" \
+      --dataset in_silico \
+      --noise "$noise" \
+      --output "${result_dir}/in_silico_noise_${noise}.json"
+  done
+  P2P_RUN_NAME="$RUN_NAME" conda run --no-capture-output -n "$P2P_CONDA_ENV" \
+    python experiments/geotransformer.p2p_liver/test.py \
+    --architecture rtor_a3 \
+    --interaction_profile cooperative \
+    --ablation_profile "$PROFILE" \
+    --snapshot "$checkpoint" \
+    --dataset in_vitro \
+    --noise none \
+    --output "${result_dir}/in_vitro_noise_none.json"
+}
+
+case "$action" in
+  train) train_model ;;
+  test) test_model ;;
+  all)
+    train_model
+    test_model
+    ;;
+esac

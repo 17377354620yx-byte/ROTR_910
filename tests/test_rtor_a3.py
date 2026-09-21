@@ -68,6 +68,30 @@ def test_a3_masks_invalid_points():
     assert torch.isfinite(src_output).all()
 
 
+def test_a3_without_geometry_bias_skips_geometry_signature():
+    module = GeometryAwareFineRefiner(
+        feature_dim=8,
+        num_heads=2,
+        residual_init=0.1,
+        use_geometry_bias=False,
+    ).eval()
+
+    def unexpected_geometry_call(*args, **kwargs):
+        raise AssertionError('geometry bias must not be computed')
+
+    module._cross_geometry_bias = unexpected_geometry_call
+    ref_output, src_output = module(
+        torch.randn(2, 3, 8),
+        torch.randn(2, 4, 8),
+        torch.randn(2, 3, 3),
+        torch.randn(2, 4, 3),
+        torch.ones(2, 3, dtype=torch.bool),
+        torch.ones(2, 4, dtype=torch.bool),
+    )
+    assert torch.isfinite(ref_output).all()
+    assert torch.isfinite(src_output).all()
+
+
 def test_source_overlap_selection_falls_back_on_flat_probabilities():
     valid_mask = torch.ones(20, dtype=torch.bool)
     selected = select_overlap_region(

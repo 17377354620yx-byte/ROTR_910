@@ -23,7 +23,7 @@ from geotransformer.modules.registration.metrics import isotropic_transform_erro
 from geotransformer.utils.common import get_log_string
 from geotransformer.utils.torch import release_cuda
 
-from config import make_cfg
+from config import ABLATION_PROFILES, make_cfg
 from dataset import test_data_loader
 from model import create_model
 from loss import Evaluator
@@ -43,6 +43,11 @@ def make_parser():
     parser.add_argument('--registration_profile', choices=['legacy', 'tight', 'robust'], default='legacy')
     parser.add_argument('--dual_encoder', action='store_true')
     parser.add_argument('--interaction_profile', choices=['legacy', 'cooperative', 'soft_overlap'], default='legacy')
+    parser.add_argument(
+        '--ablation_profile',
+        choices=['none', *ABLATION_PROFILES],
+        default='none',
+    )
     return parser
 
 
@@ -102,6 +107,12 @@ class Tester(SingleTester):
         protocol = self._checkpoint.get('metadata', {}).get('p2p_protocol', {})
         if protocol.get('interaction_profile', cfg.model.interaction_profile) != cfg.model.interaction_profile:
             raise ValueError('Checkpoint interaction profile differs; supply its --interaction_profile explicitly')
+        checkpoint_ablation = protocol.get('ablation_profile', 'none')
+        if checkpoint_ablation != cfg.ablation.profile:
+            raise ValueError(
+                'Checkpoint ablation profile differs; supply its '
+                '--ablation_profile explicitly'
+            )
         if 'neighbor_limits' in protocol:
             cfg.data.neighbor_limits = protocol['neighbor_limits']
         noise_mm = None if self.args.noise == 'none' else int(self.args.noise)
@@ -278,6 +289,17 @@ class Tester(SingleTester):
             'dual_encoder': self.cfg.model.dual_encoder,
             'registration_profile': self.cfg.model.registration_profile,
             'interaction_profile': self.cfg.model.interaction_profile,
+            'ablation_profile': self.cfg.ablation.profile,
+            'ablation_switches': {
+                key: bool(self.cfg.ablation[key])
+                for key in (
+                    'predicted_proposal_exposure',
+                    'overlap_soft_weight',
+                    'rtor_poincare',
+                    'a3_geometry_bias',
+                    'rtor_descriptor_update',
+                )
+            },
             'fine_matching': dict(self.cfg.fine_matching),
             'noise_mm': None if self.args.noise == 'none' else int(self.args.noise),
             'rtor': {
@@ -314,7 +336,13 @@ def main():
     known, _ = parser.parse_known_args()
     if known.test_limit > 0:
         os.environ['P2P_TEST_LIMIT'] = str(known.test_limit)
-    cfg = make_cfg(known.architecture, known.registration_profile, known.dual_encoder, known.interaction_profile)
+    cfg = make_cfg(
+        known.architecture,
+        known.registration_profile,
+        known.dual_encoder,
+        known.interaction_profile,
+        known.ablation_profile,
+    )
     Tester(cfg, parser).run()
 
 

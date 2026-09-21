@@ -10,3 +10,7 @@
 - `../../diagnostics/interaction/`：固定训练输入的结构、loss、梯度诊断。
 
 完整诊断和适用边界见 [REPORT.md](../../diagnostics/interaction/REPORT.md)。
+
+五阶段递进消融及运行命令见 [ABLATION.md](ABLATION.md)。
+
+根据消融结果组织的精简模型及运行命令见 [COMPACT_MODEL.md](COMPACT_MODEL.md)。

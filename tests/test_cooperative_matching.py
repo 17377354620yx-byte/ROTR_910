@@ -4,11 +4,69 @@ import unittest
 import torch
 from geotransformer.modules.liver.cooperative_matching import mix_coarse_proposals, predicted_ratio_at_epoch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'experiments/geotransformer.p2p_liver'))
-from config import make_cfg
+from config import ABLATION_PROFILES, make_cfg
 from loss import FineMatchingLoss
 
 
 class CooperativeTest(unittest.TestCase):
+    def test_progressive_ablation_profiles_are_cumulative(self):
+        expected = {
+            'abl1_no_proposal': (False, True, True, True, True),
+            'abl2_no_soft_weight': (False, False, True, True, True),
+            'abl3_no_poincare': (False, False, False, True, True),
+            'abl4_no_a3_geometry': (False, False, False, False, True),
+            'abl5_no_rtor_descriptor': (False, False, False, False, False),
+        }
+        self.assertEqual(
+            tuple(ABLATION_PROFILES)[:len(expected)],
+            tuple(expected),
+        )
+        for profile, switches in expected.items():
+            cfg = make_cfg(
+                architecture='rtor_a3',
+                interaction_profile='cooperative',
+                ablation_profile=profile,
+            )
+            actual = (
+                cfg.ablation.predicted_proposal_exposure,
+                cfg.ablation.overlap_soft_weight,
+                cfg.ablation.rtor_poincare,
+                cfg.ablation.a3_geometry_bias,
+                cfg.ablation.rtor_descriptor_update,
+            )
+            self.assertEqual(actual, switches)
+            self.assertEqual(cfg.ablation.profile, profile)
+            self.assertFalse(cfg.overlap_selection.enabled)
+            self.assertEqual(
+                cfg.coarse_matching.predicted_ratio_max,
+                0.25 if switches[0] else 0.0,
+            )
+
+    def test_no_ablation_preserves_cooperative_defaults(self):
+        cfg = make_cfg(interaction_profile='cooperative')
+        self.assertEqual(cfg.ablation.profile, 'none')
+        self.assertEqual(
+            (
+                cfg.ablation.predicted_proposal_exposure,
+                cfg.ablation.overlap_soft_weight,
+                cfg.ablation.rtor_poincare,
+                cfg.ablation.a3_geometry_bias,
+                cfg.ablation.rtor_descriptor_update,
+            ),
+            (True, True, True, True, True),
+        )
+        self.assertEqual(cfg.coarse_matching.predicted_ratio_max, 0.25)
+
+    def test_ablation_profiles_reject_non_cooperative_models(self):
+        with self.assertRaisesRegex(ValueError, 'Ablation profiles require'):
+            make_cfg(ablation_profile='abl1_no_proposal')
+        with self.assertRaisesRegex(ValueError, 'Ablation profiles require'):
+            make_cfg(
+                architecture='a3_only',
+                interaction_profile='cooperative',
+                ablation_profile='abl1_no_proposal',
+            )
+
     def test_schedule_keeps_warmup_and_bounds(self):
         self.assertEqual([predicted_ratio_at_epoch(x) for x in (1,5,20,150)],[0.,0.,.25,.25])
 

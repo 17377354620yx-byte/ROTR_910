@@ -24,7 +24,7 @@ import torch.optim as optim
 
 from geotransformer.engine import EpochBasedTrainer
 
-from config import make_cfg
+from config import ABLATION_PROFILES, make_cfg
 from dataset import train_valid_data_loader
 from loss import Evaluator, OverallLoss
 from model import create_model
@@ -45,6 +45,17 @@ class Trainer(EpochBasedTrainer):
                         dual_encoder=cfg.model.dual_encoder,
                         registration_profile=cfg.model.registration_profile,
                         interaction_profile=cfg.model.interaction_profile,
+                        ablation_profile=cfg.ablation.profile,
+                        ablation_switches={
+                            key: bool(cfg.ablation[key])
+                            for key in (
+                                'predicted_proposal_exposure',
+                                'overlap_soft_weight',
+                                'rtor_poincare',
+                                'a3_geometry_bias',
+                                'rtor_descriptor_update',
+                            )
+                        },
                         neighbor_limits=[int(x) for x in limits], seed=int(cfg.seed),
                         validation='disjoint deformation groups')
         self.save_state('p2p_protocol', protocol)
@@ -72,6 +83,14 @@ class Trainer(EpochBasedTrainer):
             saved_profile = state_dict.get('metadata', {}).get('p2p_protocol', {}).get('interaction_profile')
             if saved_profile is not None and saved_profile != self.cfg.model.interaction_profile:
                 raise ValueError('Resume must use the checkpoint interaction profile; use --warm_start for an intentional new run')
+            saved_ablation = state_dict.get('metadata', {}).get(
+                'p2p_protocol', {}
+            ).get('ablation_profile', 'none')
+            if saved_ablation != self.cfg.ablation.profile:
+                raise ValueError(
+                    'Resume must use the checkpoint ablation profile; '
+                    'use --warm_start for an intentional new run'
+                )
             self.best_validation_error = state_dict.get('metadata', {}).get('best_validation_error', float('inf'))
             strict_dict = (OrderedDict(('module.' + k, v) for k, v in model_dict.items())
                            if fix_prefix and self.distributed else model_dict)
@@ -149,6 +168,11 @@ def main():
     parser.add_argument('--registration_profile', choices=['legacy', 'tight', 'robust'], default='legacy')
     parser.add_argument('--dual_encoder', action='store_true')
     parser.add_argument('--interaction_profile', choices=['legacy', 'cooperative', 'soft_overlap'], default='legacy')
+    parser.add_argument(
+        '--ablation_profile',
+        choices=['none', *ABLATION_PROFILES],
+        default='none',
+    )
     parser.add_argument('--lr', type=float, default=None)
     parser.add_argument("--train_limit", type=int, default=0)
     parser.add_argument("--validation_size", type=int, default=None)
@@ -161,7 +185,13 @@ def main():
     known, _ = parser.parse_known_args()
     if known.train_limit > 0:
         os.environ["P2P_TRAIN_LIMIT"] = str(known.train_limit)
-    cfg = make_cfg(known.architecture, known.registration_profile, known.dual_encoder, known.interaction_profile)
+    cfg = make_cfg(
+        known.architecture,
+        known.registration_profile,
+        known.dual_encoder,
+        known.interaction_profile,
+        known.ablation_profile,
+    )
     if known.lr is not None:
         if known.lr <= 0:
             parser.error('--lr must be positive')
