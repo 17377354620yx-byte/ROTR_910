@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT=/home/yangx/code/new_deform/ai_worker/RTORv2
-DATA_ROOT=${IRCADB_DATA_ROOT:-/mnt/data3/yangx/3Dircadb/low_overlap_rigid_40_seed20260822}
-RESULT_ROOT=${IRCADB_RESULT_ROOT:-$ROOT/results/3dircadb_low_overlap_40_seed20260822}
+DATA_ROOT=${IRCADB_DATA_ROOT:-/home/yangx/code/new_deform/RTORv6/output/ircadb1_vis20_30_noise2_rot25_90_seed20260822/dataset/pairs}
+RESULT_ROOT=${IRCADB_RESULT_ROOT:-$ROOT/results/rtorv6_fixed_ircadb1_vis20_30_seed20260822}
 GPU=${IRCADB_GPU:-1}
 LIMIT=${IRCADB_LIMIT:-0}
 DRY_RUN=${IRCADB_DRY_RUN:-0}

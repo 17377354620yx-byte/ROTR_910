@@ -1,4 +1,5 @@
 import json
+import csv
 from pathlib import Path
 
 import numpy as np
@@ -77,6 +78,37 @@ def test_load_samples_filters_and_rejects_duplicate_ids(tmp_path):
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="Duplicate sample ID"):
         load_samples(tmp_path)
+
+
+def test_loads_fixed_rtorv6_csv_pairs_without_rewriting_files(tmp_path):
+    dataset = tmp_path / "dataset"
+    pairs = dataset / "pairs"
+    pairs.mkdir(parents=True)
+    transform = _transform()
+    source = np.arange(30, dtype=np.float32).reshape(-1, 3)
+    target = source[:2] @ transform[:3, :3].T + transform[:3, 3]
+    path = pairs / "3Dircadb1.7_vis20.npz"
+    np.savez_compressed(
+        path, source_points=source, target_points=target,
+        target_clean=target, transform_gt=transform,
+        crop_indices=np.asarray([0, 1], dtype=np.int32),
+    )
+    with (dataset / "manifest.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=[
+            "sample_id", "case_id", "visibility", "npz",
+        ])
+        writer.writeheader()
+        writer.writerow({
+            "sample_id": "3Dircadb1.7_vis20", "case_id": "3Dircadb1.7",
+            "visibility": 0.2, "npz": str(path),
+        })
+
+    record = load_samples(pairs)[0]
+    sample = record.load()
+    assert record.case_id == 7 and record.pair_id == 0
+    np.testing.assert_array_equal(sample["src_points"], source)
+    np.testing.assert_array_equal(sample["ref_points"], target)
+    np.testing.assert_array_equal(sample["transform"], transform)
 
 
 def test_independent_centering_transform_round_trip(tmp_path):

@@ -27,7 +27,17 @@ class SampleRecord:
 
     def load(self) -> dict[str, np.ndarray]:
         with np.load(self.path, allow_pickle=False) as data:
-            return {key: np.asarray(data[key]) for key in data.files}
+            sample = {key: np.asarray(data[key]) for key in data.files}
+        aliases = {
+            "src_points": "source_points",
+            "ref_points": "target_points",
+            "clean_ref_points": "target_clean",
+            "transform": "transform_gt",
+        }
+        for canonical, native in aliases.items():
+            if canonical not in sample and native in sample:
+                sample[canonical] = sample[native]
+        return sample
 
 
 @dataclass(frozen=True)
@@ -40,12 +50,39 @@ class NormalizedPair:
 
 
 def _manifest(root: Path) -> tuple[dict, str]:
-    path = Path(root) / "manifest.json"
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    raw = path.read_bytes()
-    manifest = json.loads(raw)
-    return manifest, hashlib.sha256(raw).hexdigest()
+    root = Path(root)
+    json_path = root / "manifest.json"
+    if json_path.is_file():
+        raw = json_path.read_bytes()
+        return json.loads(raw), hashlib.sha256(raw).hexdigest()
+
+    csv_path = root / "manifest.csv"
+    if not csv_path.is_file() and root.name == "pairs":
+        csv_path = root.parent / "manifest.csv"
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"No manifest.json or manifest.csv for {root}")
+    raw = csv_path.read_bytes()
+    with csv_path.open(newline="", encoding="utf-8") as handle:
+        native_rows = list(csv.DictReader(handle))
+    rows = []
+    for native in native_rows:
+        case_text = str(native["case_id"])
+        case_id = int(case_text.rsplit(".", 1)[-1])
+        path = Path(native["npz"])
+        if not path.is_absolute():
+            path = csv_path.parent / path
+        rows.append({
+            "sample_id": str(native["sample_id"]),
+            "path": str(path),
+            "case_id": case_id,
+            "pair_id": int(native.get("pair_id") or 0),
+            "visibility": float(native["visibility"]),
+        })
+    return {
+        "parameters": {"schema_version": 1, "source": "rtorv6_manifest_csv"},
+        "sample_count": len(rows),
+        "samples": rows,
+    }, hashlib.sha256(raw).hexdigest()
 
 
 def load_samples(
@@ -81,7 +118,9 @@ def load_samples(
             continue
         if requested_visibility is not None and not np.isclose(value, requested_visibility):
             continue
-        path = root / row["path"]
+        path = Path(row["path"])
+        if not path.is_absolute():
+            path = root / path
         if not path.is_file():
             raise FileNotFoundError(path)
         records.append(SampleRecord(
