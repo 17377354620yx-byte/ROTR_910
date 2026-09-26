@@ -109,6 +109,17 @@ def test_failed_method_and_pyvista_error_fall_back_to_complete_software_figure(
     assert result["backend"] == "software"
     assert Path(result["png"]).is_file()
     assert Path(result["pdf"]).is_file()
+    individual_root = Path(result["individual_panels_root"])
+    raw_panels = sorted(individual_root.rglob("raw/*.png"))
+    titled_panels = sorted(individual_root.rglob("titled/*.png"))
+    assert len(raw_panels) == 36
+    assert len(titled_panels) == 36
+    assert (individual_root / "case_0/raw/00_initial_position.png").is_file()
+    assert (individual_root / "case_0/titled/01_ours.png").is_file()
+    assert (individual_root / "case_2/titled/11_ground_truth.png").is_file()
+    panel_index = json.loads((individual_root / "index.json").read_text())
+    assert len(panel_index["panels"]) == 36
+    assert panel_index["panels"][1]["title"] == "Ours\nRMS-TRE: 0.83 mm"
     failed = [panel for panel in result["panels"] if panel["status"] != "ok"]
     assert len(failed) == 1
     assert "FAILED" in failed[0]["title"]

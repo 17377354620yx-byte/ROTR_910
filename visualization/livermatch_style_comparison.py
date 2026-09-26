@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 from tools.evaluate_goicp_visibility import load_p2p_sample
 from visualization.error_heatmap import apply_transform
@@ -113,6 +114,78 @@ def build_panel_specs(
 def _safe_sample(value: str) -> str:
     stem = Path(value).stem
     return "".join(char if char.isalnum() or char in "-_" else "_" for char in stem)
+
+
+def _sample_directory(value: str) -> str:
+    without_suffix = str(Path(value).with_suffix(""))
+    return "__".join(
+        "".join(char if char.isalnum() or char in "-_" else "_" for char in part)
+        for part in Path(without_suffix).parts
+    )
+
+
+def _file_slug(value: str) -> str:
+    return "_".join(
+        part for part in "".join(
+            char.lower() if char.isalnum() else " " for char in value
+        ).split()
+    )
+
+
+def _title_font(size: int = 18):
+    try:
+        return ImageFont.truetype("DejaVuSansMono.ttf", size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def _export_individual_panels(
+    dataset: str,
+    all_specs: Sequence[tuple[Mapping, Sequence[Mapping]]],
+    images: Sequence[Sequence[np.ndarray]],
+    output_root: Path,
+) -> tuple[Path, list[dict]]:
+    root = output_root / "individual_panels" / dataset
+    entries = []
+    font = _title_font()
+    for (case, specs), row_images in zip(all_specs, images):
+        sample = str(case["sample"])
+        sample_root = root / _sample_directory(sample)
+        raw_root = sample_root / "raw"
+        titled_root = sample_root / "titled"
+        raw_root.mkdir(parents=True, exist_ok=True)
+        titled_root.mkdir(parents=True, exist_ok=True)
+        for column, (spec, panel_image) in enumerate(zip(specs, row_images)):
+            filename = f"{column:02d}_{_file_slug(str(spec['label']))}.png"
+            raw_path = raw_root / filename
+            titled_path = titled_root / filename
+            raw = Image.fromarray(np.asarray(panel_image, dtype=np.uint8), mode="RGB")
+            raw.save(raw_path)
+            title_height = 64
+            titled = Image.new("RGB", (raw.width, raw.height + title_height), "white")
+            titled.paste(raw, (0, title_height))
+            draw = ImageDraw.Draw(titled)
+            title = str(spec["title"])
+            bbox = draw.multiline_textbbox((0, 0), title, font=font, align="center", spacing=2)
+            x = (raw.width - (bbox[2] - bbox[0])) / 2 - bbox[0]
+            y = (title_height - (bbox[3] - bbox[1])) / 2 - bbox[1]
+            color = "crimson" if spec["status"] != "ok" else "black"
+            draw.multiline_text((x, y), title, fill=color, font=font, align="center", spacing=2)
+            titled.save(titled_path)
+            entries.append(
+                {
+                    **_public_panel(spec, int(case["subset_index"]), column, sample),
+                    "raw_path": str(raw_path.resolve()),
+                    "titled_path": str(titled_path.resolve()),
+                }
+            )
+    index_path = root / "index.json"
+    index_path.write_text(
+        json.dumps({"dataset": dataset, "panels": entries}, indent=2, ensure_ascii=False)
+        + "\n",
+        encoding="utf-8",
+    )
+    return root, entries
 
 
 def _load_prediction(path: Path) -> dict:
@@ -287,6 +360,13 @@ def render_dataset_comparison(
     fig.savefig(pdf, dpi=dpi, facecolor="white")
     plt.close(fig)
 
+    individual_root, individual_panels = _export_individual_panels(
+        dataset, all_specs, images, output_root
+    )
+    for panel, individual in zip(public_panels, individual_panels):
+        panel["raw_path"] = individual["raw_path"]
+        panel["titled_path"] = individual["titled_path"]
+
     result = {
         "dataset": dataset,
         "backend": selected_backend,
@@ -295,6 +375,7 @@ def render_dataset_comparison(
         "panel_count": len(public_panels),
         "png": str(png.resolve()),
         "pdf": str(pdf.resolve()),
+        "individual_panels_root": str(individual_root.resolve()),
         "panels": public_panels,
     }
     dataset_manifest = output_root / f"{dataset}_manifest.json"

@@ -38,7 +38,10 @@ After inference, render and audit the figures with:
 ```
 
 The output root then contains the two PNG/PDF comparison figures,
-`metrics.csv`, and `manifest.json`.
+`metrics.csv`, and `manifest.json`. Every panel is also exported separately
+under `individual_panels/<dataset>/<sample>/`: `raw/` contains point clouds
+without titles and `titled/` contains the same panels with method/RMS-TRE
+titles. Each dataset directory includes an `index.json` path and metric index.
 
 ## Completed run (2026-09-26)
 
