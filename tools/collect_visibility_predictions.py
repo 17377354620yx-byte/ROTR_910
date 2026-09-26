@@ -49,7 +49,10 @@ def _safe_sample(value: str) -> str:
 
 def _row_for_case(rows: Sequence[Mapping], case: Mapping) -> Mapping:
     sample = str(case["sample"])
-    matches = [row for row in rows if str(row.get("sample", "")) == sample]
+    matches = [
+        row for row in rows
+        if str(row.get("sample", row.get("sample_name", ""))) == sample
+    ]
     if len(matches) == 1:
         return matches[0]
     subset_index = int(case["subset_index"])
@@ -115,7 +118,7 @@ def collect_method_predictions(
         transform = _artifact_transform(row, artifact_map, subset_index)
         if status == "ok" and transform is None:
             raise ValueError(f"Successful prediction has no transform: {method}/{sample}")
-        rms = float(row["rms_tre_mm"])
+        rms = float(row.get("rms_tre_mm", row.get("RMS_TRE_mm")))
         if not math.isfinite(rms):
             raise ValueError(f"Non-finite RMS-TRE: {method}/{sample}")
         metadata = {

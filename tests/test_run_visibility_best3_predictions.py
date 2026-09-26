@@ -44,5 +44,8 @@ def test_dry_run_contains_all_models_environments_checkpoints_and_two_datasets(t
         assert checkpoint in output
     assert "--k 5" in output
     assert "--save_predictions" in output
+    assert "parenet_predictions" in output
+    cast_vitro = next(line for line in lines if line.startswith("MODEL_CMD castv2 in_vitro "))
+    assert "P2P_IN_VITRO_ROOT=" in cast_vitro
     assert str(tmp_path / "must_not_exist") in output
     assert not (tmp_path / "must_not_exist").exists()

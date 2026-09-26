@@ -96,3 +96,27 @@ def test_livermatch_prediction_export_serializes_success_and_failure():
     failed = prediction_export_fields({}, status="error", error="model failed")
     assert success == {"status": "ok", "error": None, "estimated_transform": transform(3.0).tolist()}
     assert failed == {"status": "error", "error": "model failed", "estimated_transform": None}
+
+
+def test_collect_accepts_lepard_metric_and_sample_field_names(tmp_path: Path):
+    selection = [{"subset_index": 0, "sample": "nested/case.npz"}]
+    summary = {
+        "checkpoint": "/lepard.pth",
+        "samples": [{
+            "index": 0,
+            "sample_name": "nested/case.npz",
+            "RMS_TRE_mm": 1.5,
+            "estimated_transform": transform(1.0).tolist(),
+        }],
+    }
+
+    records = collect_method_predictions(
+        "lepard",
+        "in_silico",
+        selection,
+        {"summary": summary, "expected_checkpoint": "/lepard.pth"},
+        tmp_path,
+    )
+
+    assert records[0]["sample"] == "nested/case.npz"
+    assert records[0]["rms_tre_mm"] == 1.5

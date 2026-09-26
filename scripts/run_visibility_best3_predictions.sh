@@ -69,6 +69,8 @@ if [[ "$DRY_RUN" == "1" ]]; then
       extra="--save_predictions"
       [[ "$method" == "lepard_p2p" || "$method" == "livermatch_p2p" ]] && extra="$extra --k 5"
       [[ "$method" == "goicp" ]] && extra="--goicp-root $GOICP_ROOT"
+      [[ "$method" == "parenet" ]] && extra="$extra artifact=$OUTPUT_ROOT/raw/$dataset/parenet_predictions"
+      [[ "$method" == "castv2" ]] && extra="$extra P2P_IN_VITRO_ROOT=$OUTPUT_ROOT/subsets/in_vitro"
       printf 'MODEL_CMD %s %s %s checkpoint=%s %s output=%s/raw/%s/%s.json\n' \
         "$method" "$dataset" "$(python_for "$method")" "$(checkpoint_for "$method")" \
         "$extra" "$OUTPUT_ROOT" "$dataset" "$method"
@@ -163,6 +165,7 @@ run_method() {
       ;;
     castv2)
       run_logged "$output" env CUDA_VISIBLE_DEVICES="$GPU" P2P_DATA_ROOT="$data_root" \
+        P2P_IN_VITRO_ROOT="$VITRO_SUBSET" \
         P2P_METRICS_ROOT="$PROJECT_ROOT" "$PY_CAST" "$CAST_ROOT/test_p2p_liver.py" \
         --config "$CAST_ROOT/config/p2p_liver.json" --snapshot "$CAST_CKPT" \
         --dataset "$dataset" --noise "$noise" --save_predictions --output "$output"
@@ -200,7 +203,7 @@ run_method() {
         --snapshot "$PARE_CKPT" --dataset "$dataset" --noise "$noise" \
         --num_workers 0 --save_predictions --output "$output"
       collect "$method" "$dataset" "$output" prediction_dir \
-        "$PARE_ROOT/output/P2P.visibility_best3/registration"
+        "${output%.json}_predictions"
       ;;
     livermatch|livermatch_p2p)
       mode="base"; [[ "$method" == "livermatch_p2p" ]] && mode="p2p"

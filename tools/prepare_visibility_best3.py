@@ -28,7 +28,7 @@ def select_best_cases(summary: Mapping, top_k: int = 3) -> list[dict]:
         status = str(row.get("status", "ok"))
         try:
             rms = float(row["rms_tre_mm"])
-            original_index = int(row["original_index"])
+            original_index = int(row.get("original_index", row["index"]))
         except (KeyError, TypeError, ValueError):
             continue
         if not sample or status != "ok" or not math.isfinite(rms):
@@ -145,6 +145,16 @@ def main() -> None:
     for dataset, filename in DATASETS.items():
         summary_path = args.result_root / "ours" / filename
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        original_indices = np.load(
+            roots[dataset] / "original_indices.npy", allow_pickle=False
+        )
+        for row in summary.get("samples", []):
+            subset_index = int(row["index"])
+            if subset_index < 0 or subset_index >= len(original_indices):
+                raise ValueError(
+                    f"Summary index {subset_index} is outside original_indices.npy"
+                )
+            row["original_index"] = int(original_indices[subset_index])
         cases = select_best_cases(summary, args.top_k)
         subset_root = args.output_root / "subsets" / dataset
         subset = build_subset(dataset, roots[dataset], cases, subset_root)

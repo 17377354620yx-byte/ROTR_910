@@ -29,6 +29,21 @@ def test_select_best_cases_filters_invalid_and_breaks_ties_stably():
     assert [row["subset_index"] for row in selected] == [0, 1, 2]
 
 
+def test_select_best_cases_accepts_benchmark_rows_without_original_index():
+    summary = {
+        "samples": [
+            {"sample": "a.npz", "index": 7, "visibility": 0.2, "rms_tre_mm": 0.1},
+            {"sample": "b.npz", "index": 3, "visibility": 0.3, "rms_tre_mm": 0.1},
+            {"sample": "c.npz", "index": 5, "visibility": 0.3, "rms_tre_mm": 0.2},
+        ]
+    }
+
+    selected = select_best_cases(summary, top_k=3)
+
+    assert [row["sample"] for row in selected] == ["b.npz", "a.npz", "c.npz"]
+    assert [row["original_index"] for row in selected] == [3, 7, 5]
+
+
 @pytest.mark.parametrize("dataset", ["in_silico", "in_vitro"])
 def test_build_subset_preserves_name_statistics_and_original_index(tmp_path: Path, dataset: str):
     source = tmp_path / "source"

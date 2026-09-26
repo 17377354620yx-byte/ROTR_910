@@ -35,3 +35,33 @@ After inference, render and audit the figures with:
 
 The output root then contains the two PNG/PDF comparison figures,
 `metrics.csv`, and `manifest.json`.
+
+## Completed run (2026-09-26)
+
+The fixed Ours-best cases used by the delivered figures are:
+
+| Dataset | Sample | Visibility | Ours RMS-TRE (mm) |
+|---|---|---:|---:|
+| in-silico | `00008/00002/00000.npz` | 0.397333 | 0.525337 |
+| in-silico | `00049/00000/00001.npz` | 0.206321 | 0.563705 |
+| in-silico | `00046/00002/00003.npz` | 0.386601 | 0.574366 |
+| in-vitro | `5_00086.npz` | 0.362451 | 2.009561 |
+| in-vitro | `5_00085.npz` | 0.294200 | 2.148071 |
+| in-vitro | `5_00087.npz` | 0.314000 | 2.327428 |
+
+Both figures contain 36 panels (3 rows x 12 columns) at 15600 x 6000 pixels.
+The run produced all 60 normalized method/sample caches and passed the Ours
+consistency check. Go-ICP timed out on in-silico sample
+`00049/00000/00001.npz`; that panel is intentionally marked `FAILED`.
+
+This host exposes a VTK X11 render window but has no X server or Xvfb. The
+completed run therefore used the deterministic software point renderer while
+preserving the LiverMatch layout, white background, blue/red palette, shared
+per-row camera, and RMS-TRE titles:
+
+```bash
+/home/yangx/miniconda3/envs/geo_v2/bin/python -m \
+  visualization.livermatch_style_comparison \
+  --root output/visualization/visibility_0.2_0.4_livermatch_style \
+  --backend software --dpi 500
+```
