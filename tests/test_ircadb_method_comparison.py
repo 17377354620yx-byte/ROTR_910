@@ -11,6 +11,7 @@ from visualization.ircadb_method_comparison import (
     LABELS,
     METHODS,
     load_case_transforms,
+    panel_artifact_paths,
     partial_source_points,
     pointwise_gt_error_mm,
     render_sample,
@@ -29,6 +30,17 @@ def test_artifact_paths_preserve_dotted_fixed_sample_id(tmp_path):
     assert paths["png"].name == "3Dircadb1.19_vis20.png"
     assert paths["pdf"].name == "3Dircadb1.19_vis20.pdf"
     assert paths["json"].name == "3Dircadb1.19_vis20.json"
+
+
+def test_panel_artifact_paths_are_grouped_by_sample_and_method(tmp_path):
+    paths = panel_artifact_paths(
+        tmp_path, "3Dircadb1.19_vis20", ["initial", "dfat", "ground_truth"]
+    )
+    assert paths["dfat"]["registration"] == (
+        tmp_path / "individual_panels" / "3Dircadb1.19_vis20"
+        / "01_dfat_registration.png"
+    )
+    assert paths["dfat"]["heatmap"].name == "01_dfat_heatmap.png"
 
 
 def test_complete_figure_requires_ten_predictions(tmp_path):
@@ -123,10 +135,14 @@ def test_synthetic_render_uses_explicit_viridis_and_shared_range(tmp_path, monke
 
     monkeypatch.setattr(Axes, "text", capture_text)
     payload = render_sample(record, transforms, tmp_path / "figures", dpi=40,
-                            colormap="viridis")
+                            colormap="viridis", export_panels=True)
     assert Path(payload["png"]).is_file()
     assert Path(payload["pdf"]).is_file()
     assert payload["colormap"] == "viridis"
     assert payload["shared_color_range_mm"][0] == 0.0
     assert payload["heatmap_point_count"] == 30
     assert not any(text.startswith("[") and text.endswith("] mm") for text in drawn_text)
+    assert len(payload["individual_panels"]) == len(LABELS)
+    dfat = payload["individual_panels"]["dfat"]
+    assert Path(dfat["registration"]).is_file()
+    assert Path(dfat["heatmap"]).is_file()

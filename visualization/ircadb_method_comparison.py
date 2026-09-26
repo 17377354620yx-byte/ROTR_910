@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 import numpy as np
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -55,6 +56,18 @@ def artifact_paths(output_dir: Path, sample_id: str) -> dict[str, Path]:
     }
 
 
+def panel_artifact_paths(output_dir: Path, sample_id: str,
+                         panel_keys) -> dict[str, dict[str, Path]]:
+    directory = Path(output_dir) / "individual_panels" / str(sample_id)
+    return {
+        key: {
+            kind: directory / f"{index:02d}_{key}_{kind}.png"
+            for kind in ("registration", "heatmap")
+        }
+        for index, key in enumerate(panel_keys)
+    }
+
+
 def pointwise_gt_error_mm(source_mm: np.ndarray, estimate_mm: np.ndarray,
                           ground_truth_mm: np.ndarray) -> np.ndarray:
     # Public re-export keeps the 3D-IRCADb visualization API self-contained.
@@ -75,7 +88,7 @@ def partial_source_points(sample: dict) -> np.ndarray:
 def fit_heatmap_cameras(point_sets, panel_size):
     """Tightly frame every registered Partial cloud with one fixed view direction."""
     return [
-        _fit_camera([points], panel_size, None, fill_fraction=0.84)
+        _fit_camera([points], panel_size, None, fill_fraction=0.85)
         for points in point_sets
     ]
 
@@ -141,7 +154,8 @@ def load_case_transforms(sample_id: str, result_root: Path,
 
 
 def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None],
-                  output_dir: Path, dpi: int = 500, colormap: str = "viridis") -> dict:
+                  output_dir: Path, dpi: int = 500, colormap: str = "viridis",
+                  export_panels: bool = False) -> dict:
     sample = record.load()
     source = np.asarray(sample["src_points"], dtype=np.float64)
     partial_source = partial_source_points(sample)
@@ -168,18 +182,34 @@ def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None]
     color_max = shared_color_limit(registered_method_errors)
     norm = Normalize(0.0, color_max, clip=True)
     cmap = matplotlib.colormaps[colormap]
-    panel_size = (720, 600)
-    camera = _fit_camera([target, *registered], panel_size, None, fill_fraction=0.80)
+    # Render every registration pair at a separately fitted scale so that
+    # outlier poses do not crop the cloud in their own panel. The view direction
+    # is kept consistent by _fit_camera; magnification may differ by panel.
+    panel_size = (900, 750)
+    registration_cameras = [
+        _fit_camera([points, target], panel_size, None, fill_fraction=0.78)
+        for points in registered
+    ]
     heat_cameras = fit_heatmap_cameras(heat_registered, panel_size)
 
-    top_images = [render_point_clouds(
-        [(points, SOURCE_COLOR), (target, TARGET_COLOR)], camera,
-        width=panel_size[0], height=panel_size[1], point_size=2.8, backend="software",
-    ) for points in registered]
-    bottom_images = [render_point_clouds(
-        [(points, cmap(norm(error))[:, :3])], heat_camera,
-        width=panel_size[0], height=panel_size[1], point_size=3.4, backend="software",
-    ) for points, error, heat_camera in zip(heat_registered, errors, heat_cameras)]
+    top_images = [
+        render_point_clouds(
+            [(points, SOURCE_COLOR), (target, TARGET_COLOR)],
+            registration_camera,
+            width=panel_size[0], height=panel_size[1],
+            point_size=3.0, backend="software",
+        )
+        for points, registration_camera in zip(registered, registration_cameras)
+    ]
+    bottom_images = [
+        render_point_clouds(
+            [(points, cmap(norm(error))[:, :3])],
+            heat_camera,
+            width=panel_size[0], height=panel_size[1],
+            point_size=3.4, backend="software",
+        )
+        for points, error, heat_camera in zip(heat_registered, errors, heat_cameras)
+    ]
 
     fig = plt.figure(figsize=(2.35 * len(LABELS), 7.4), facecolor="white")
     grid = fig.add_gridspec(
@@ -218,6 +248,20 @@ def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None]
     fig.savefig(png, dpi=dpi, facecolor="white")
     fig.savefig(pdf, dpi=dpi, facecolor="white")
     plt.close(fig)
+    individual_panels = {}
+    if export_panels:
+        panel_keys = ["initial", *[method for method, _ in METHODS], "ground_truth"]
+        panel_paths = panel_artifact_paths(output_dir, record.sample_id, panel_keys)
+        for key, registration, heatmap in zip(panel_keys, top_images, bottom_images):
+            registration_path = panel_paths[key]["registration"]
+            heatmap_path = panel_paths[key]["heatmap"]
+            registration_path.parent.mkdir(parents=True, exist_ok=True)
+            Image.fromarray(np.asarray(registration, dtype=np.uint8)).save(registration_path)
+            Image.fromarray(np.asarray(heatmap, dtype=np.uint8)).save(heatmap_path)
+            individual_panels[key] = {
+                "registration": str(registration_path.resolve()),
+                "heatmap": str(heatmap_path.resolve()),
+            }
     statistics = {}
     for label, error, is_failed in zip(LABELS, errors, failed):
         statistics[label] = {
@@ -236,6 +280,7 @@ def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None]
         "shared_color_range_mm": [0.0, color_max],
         "heatmap_scope": "partial_crop_indices",
         "heatmap_point_count": int(len(partial_source)),
+        "individual_panels": individual_panels,
         "png": str(png.resolve()),
         "pdf": str(pdf.resolve()),
         "statistics": statistics,
@@ -265,6 +310,7 @@ def main():
     parser.add_argument("--allow-failed", action="store_true")
     parser.add_argument("--exclude-methods", default="")
     parser.add_argument("--select-best-ours", action="store_true")
+    parser.add_argument("--export-panels", action="store_true")
     args = parser.parse_args()
     excluded = {item.strip() for item in args.exclude_methods.split(",") if item.strip()}
     unknown = excluded - {method for method, _ in METHODS}
@@ -297,7 +343,10 @@ def main():
     outputs = []
     for record in records:
         transforms = load_case_transforms(record.sample_id, args.result_root, args.allow_failed)
-        outputs.append(render_sample(record, transforms, args.output_dir, args.dpi, args.colormap))
+        outputs.append(render_sample(
+            record, transforms, args.output_dir, args.dpi, args.colormap,
+            export_panels=args.export_panels,
+        ))
         print(f"Rendered {record.sample_id}", flush=True)
     manifest = args.output_dir / "comparison_manifest.json"
     manifest.write_text(json.dumps({
@@ -305,6 +354,7 @@ def main():
         "labels": LABELS,
         "colormap": args.colormap,
         "ours_best_selection": selection,
+        "export_panels": args.export_panels,
         "samples": outputs,
     }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Wrote {manifest}")
