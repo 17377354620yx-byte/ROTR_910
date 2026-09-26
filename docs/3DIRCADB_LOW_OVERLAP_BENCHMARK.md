@@ -3,8 +3,8 @@
 ## 已验证协议
 
 - 数据源：`/mnt/data3/yangx/3Dircadb/3Dircadb1`
-- 正式数据：`/mnt/data3/yangx/3Dircadb/low_overlap_rigid_seed20260822`
-- 20 个病例，每例 `20 对 × 20%` 和 `20 对 × 30%`，共 800 对
+- 正式数据：`/mnt/data3/yangx/3Dircadb/low_overlap_rigid_40_seed20260822`
+- 20 个病例，每个病例生成 1 个嵌套 pair，并分别保存 20% 和 30% 两档，共 40 个样本
 - 固定随机种子 `20260822`，target 高斯噪声 `σ=2 mm`
 - 主指标：`SR@5 mm`；严格召回：`RRE < 5° 且 RTE < 5 mm`
 - 所有输出变换均为原始毫米坐标中的 source→target 4×4 刚性变换
@@ -40,13 +40,13 @@ cd /home/yangx/code/new_deform/ai_worker/RTORv2
 
 /home/yangx/miniconda3/envs/geo_v2/bin/python \
   tools/build_3dircadb_low_overlap.py --validate-only \
-  --output-root /mnt/data3/yangx/3Dircadb/low_overlap_rigid_seed20260822
+  --output-root /mnt/data3/yangx/3Dircadb/low_overlap_rigid_40_seed20260822
 ```
 
 成功输出应为：
 
 ```json
-{"cases": 20, "pairs": 400, "samples": 800, "vis020": 400, "vis030": 400}
+{"cases": 20, "pairs": 20, "samples": 40, "vis020": 20, "vis030": 20}
 ```
 
 目标目录存在且 manifest 参数一致时，构建器只校验并复用；参数不一致时拒绝覆盖，需要指定新的 `--output-root`。
@@ -77,7 +77,7 @@ cd /home/yangx/code/new_deform/ai_worker/RTORv2
 默认结果目录：
 
 ```text
-/home/yangx/code/new_deform/ai_worker/RTORv2/results/3dircadb_low_overlap_seed20260822/
+/home/yangx/code/new_deform/ai_worker/RTORv2/results/3dircadb_low_overlap_40_seed20260822/
 ```
 
 ## 可选环境变量
@@ -87,26 +87,26 @@ export IRCADB_GPU=1
 export IRCADB_LIMIT=0
 export IRCADB_NUM_WORKERS=0
 export IRCADB_GOICP_TIMEOUT=120
-export IRCADB_DATA_ROOT=/mnt/data3/yangx/3Dircadb/low_overlap_rigid_seed20260822
-export IRCADB_RESULT_ROOT=/home/yangx/code/new_deform/ai_worker/RTORv2/results/3dircadb_low_overlap_seed20260822
+export IRCADB_DATA_ROOT=/mnt/data3/yangx/3Dircadb/low_overlap_rigid_40_seed20260822
+export IRCADB_RESULT_ROOT=/home/yangx/code/new_deform/ai_worker/RTORv2/results/3dircadb_low_overlap_40_seed20260822
 ```
 
 - `IRCADB_LIMIT=1` 用于单样本 smoke；正式实验必须设为 `0`。
 - `IRCADB_DRY_RUN=1` 只打印十种方法的完整原生命令，不执行。
 - 单独跑 `020` 或 `030` 时输出到各方法的 `visibility_020/` 或 `visibility_030/` 子目录，避免互相覆盖。
 - 当前实现按方法完整重跑，不做样本级断点跳过。已有合法结果不会被汇总器误当成完整新结果；中断后应重跑对应方法。
-- Go-ICP 每个样本最多 120 秒，800 对理论超时上界约 26.7 小时；超时与异常保留为失败样本，不写单位阵预测。
+- Go-ICP 每个样本最多 120 秒，40 个样本理论超时上界约 1.3 小时；超时与异常保留为失败样本，不写单位阵预测。
 
 ## 手工汇总与完整性校验
 
 ```bash
 /home/yangx/miniconda3/envs/geo_v2/bin/python \
   tools/summarize_3dircadb_benchmark.py \
-  --data-root /mnt/data3/yangx/3Dircadb/low_overlap_rigid_seed20260822 \
-  --result-root /home/yangx/code/new_deform/ai_worker/RTORv2/results/3dircadb_low_overlap_seed20260822
+  --data-root /mnt/data3/yangx/3Dircadb/low_overlap_rigid_40_seed20260822 \
+  --result-root /home/yangx/code/new_deform/ai_worker/RTORv2/results/3dircadb_low_overlap_40_seed20260822
 ```
 
-该命令严格检查十种方法的 manifest 身份、样本 ID 唯一性和 800 对完整性，生成 `summary.csv`、`summary_by_case.csv` 与 `summary.json`。仅调试不完整结果时才使用 `--allow-incomplete`。
+该命令严格检查十种方法的 manifest 身份、样本 ID 唯一性和 40 个样本完整性，生成 `summary.csv`、`summary_by_case.csv` 与 `summary.json`。仅调试不完整结果时才使用 `--allow-incomplete`。
 
 ## 可视化
 
@@ -140,6 +140,6 @@ Go-ICP 含显式失败/超时记录时，允许将该列标成 `FAILED`：
 
 - RTORv2 聚焦测试：37 passed
 - CASTv2：1 passed；Lepard：2 passed；PARENet：1 passed；Go-ICP：4 passed
-- 正式数据清单：800 样本，20%/30% 各 400，20 病例、400 个嵌套 pair
+- 正式数据清单：40 样本，20%/30% 各 20，20 病例、20 个嵌套 pair
 - 十种方法均完成 `case01_pair00_vis020` 原生单样本链路；九种学习方法成功写出变换，Go-ICP 在 5 秒 smoke 限制下写出显式 timeout
 - smoke 可视化为 2400×580 PNG，包含 12 列、2 行、`viridis` 统一色标和毫米误差范围

@@ -14,7 +14,7 @@ import numpy as np
 
 
 DEFAULT_INPUT = Path("/mnt/data3/yangx/3Dircadb/3Dircadb1")
-DEFAULT_OUTPUT = Path("/mnt/data3/yangx/3Dircadb/low_overlap_rigid_seed20260822")
+DEFAULT_OUTPUT = Path("/mnt/data3/yangx/3Dircadb/low_overlap_rigid_40_seed20260822")
 SCHEMA_VERSION = 1
 VISIBILITIES = (0.20, 0.30)
 
@@ -182,7 +182,7 @@ def build_dataset(
     output_root: Path,
     seed: int = 20260822,
     surface_points: int = 10000,
-    pairs_per_case: int = 20,
+    pairs_per_case: int = 1,
     case_ids: list[int] | None = None,
     noise_sigma_mm: float = 2.0,
     min_angle_deg: float = 25.0,
@@ -356,7 +356,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--seed", type=int, default=20260822)
     parser.add_argument("--surface-points", type=int, default=10000)
-    parser.add_argument("--pairs-per-case", type=int, default=20)
+    parser.add_argument("--pairs-per-case", type=int, default=1)
     parser.add_argument("--case-ids", type=_parse_case_ids, default=list(range(1, 21)))
     parser.add_argument("--visibilities", default="0.20,0.30")
     parser.add_argument("--noise-sigma-mm", type=float, default=2.0)

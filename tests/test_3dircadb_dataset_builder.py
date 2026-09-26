@@ -100,3 +100,21 @@ def test_small_build_is_reproducible_and_valid(tmp_path):
             assert a.files == b.files
             for key in a.files:
                 assert np.array_equal(a[key], b[key])
+
+
+def test_default_build_creates_one_nested_pair_per_case(tmp_path):
+    input_root = tmp_path / "input"
+    for case_id in (1, 2):
+        _write_stl(input_root / f"3Dircadb1.{case_id}" / "MESHES_VTK" / "liver.stl")
+
+    output = tmp_path / "output"
+    build_dataset(
+        input_root=input_root,
+        output_root=output,
+        surface_points=100,
+        case_ids=[1, 2],
+    )
+
+    assert validate_dataset(output) == {
+        "cases": 2, "pairs": 2, "samples": 4, "vis020": 2, "vis030": 2,
+    }
