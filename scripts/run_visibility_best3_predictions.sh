@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="/home/yangx/code/new_deform/ai_worker/RTORv2"
-RESULT_ROOT="$PROJECT_ROOT/results/visibility_0.2_0.4_benchmark_strict_v3"
+RESULT_ROOT="$PROJECT_ROOT/results/visibility_0.2_0.4_benchmark_metrics_v2"
 SILICO_ROOT="/mnt/data3/yangx/P2P/in_silico_visibility_0.2_0.4"
 VITRO_ROOT="/mnt/data3/yangx/P2P/in_vitro_visibility_0.2_0.4"
 OUTPUT_ROOT="${P2P_BEST3_ROOT:-$PROJECT_ROOT/output/visualization/visibility_0.2_0.4_livermatch_style}"

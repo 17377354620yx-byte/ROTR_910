@@ -7,6 +7,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/run_visibility_best3_predictions.sh"
 
 
+def test_selection_uses_completed_metrics_v2_results():
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert "results/visibility_0.2_0.4_benchmark_metrics_v2" in script
+    assert "results/visibility_0.2_0.4_benchmark_strict_v3" not in script
+
+
 def test_dry_run_contains_all_models_environments_checkpoints_and_two_datasets(tmp_path: Path):
     env = os.environ.copy()
     env.update(P2P_DRY_RUN="1", P2P_BEST3_ROOT=str(tmp_path / "must_not_exist"))

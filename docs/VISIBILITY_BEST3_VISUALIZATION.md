@@ -3,6 +3,10 @@
 The pipeline selects the three lowest Ours RMS-TRE cases independently from
 the in-silico/no-extra-noise and in-vitro benchmark summaries, reruns all ten
 methods on those fixed cases, and writes normalized source-to-target transforms.
+The selection source is the completed benchmark under
+`results/visibility_0.2_0.4_benchmark_metrics_v2/` (`summary.csv` and
+`summary.md` provide its aggregate tables; selection uses the per-sample Ours
+JSON files in the same directory).
 
 ```bash
 cd /home/yangx/code/new_deform/ai_worker/RTORv2
