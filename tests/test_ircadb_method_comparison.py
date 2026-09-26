@@ -3,9 +3,11 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from matplotlib.axes import Axes
 
 from visualization.ircadb_method_comparison import (
     artifact_paths,
+    fit_heatmap_cameras,
     LABELS,
     METHODS,
     load_case_transforms,
@@ -50,6 +52,14 @@ def test_heatmap_uses_only_partial_crop_indices():
     np.testing.assert_array_equal(partial_source_points(sample), source[[1, 4, 8]])
 
 
+def test_each_heatmap_camera_follows_its_registered_partial_cloud():
+    points = np.asarray([[0.0, 0.0, 0.0], [2.0, 4.0, 6.0]])
+    translated = points + np.asarray([100.0, -50.0, 20.0])
+    cameras = fit_heatmap_cameras([points, translated], (720, 600))
+    np.testing.assert_allclose(cameras[0]["center"], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(cameras[1]["center"], [101.0, -48.0, 23.0])
+
+
 def test_selects_largest_ours_rmse_advantage(tmp_path):
     methods = [("ours", "Ours"), ("baseline", "Baseline")]
     values = {
@@ -91,7 +101,7 @@ def _synthetic_dataset(root: Path):
     return sample_id, gt
 
 
-def test_synthetic_render_uses_explicit_viridis_and_shared_range(tmp_path):
+def test_synthetic_render_uses_explicit_viridis_and_shared_range(tmp_path, monkeypatch):
     data_root = tmp_path / "data"
     sample_id, gt = _synthetic_dataset(data_root)
     result_root = tmp_path / "results"
@@ -104,6 +114,14 @@ def test_synthetic_render_uses_explicit_viridis_and_shared_range(tmp_path):
         }))
     transforms = load_case_transforms(sample_id, result_root)
     record = load_samples(data_root)[0]
+    drawn_text = []
+    original_text = Axes.text
+
+    def capture_text(axis, x, y, text, *args, **kwargs):
+        drawn_text.append(str(text))
+        return original_text(axis, x, y, text, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "text", capture_text)
     payload = render_sample(record, transforms, tmp_path / "figures", dpi=40,
                             colormap="viridis")
     assert Path(payload["png"]).is_file()
@@ -111,3 +129,4 @@ def test_synthetic_render_uses_explicit_viridis_and_shared_range(tmp_path):
     assert payload["colormap"] == "viridis"
     assert payload["shared_color_range_mm"][0] == 0.0
     assert payload["heatmap_point_count"] == 30
+    assert not any(text.startswith("[") and text.endswith("] mm") for text in drawn_text)

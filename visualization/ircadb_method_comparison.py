@@ -72,6 +72,14 @@ def partial_source_points(sample: dict) -> np.ndarray:
     return np.ascontiguousarray(source[indices])
 
 
+def fit_heatmap_cameras(point_sets, panel_size):
+    """Tightly frame every registered Partial cloud with one fixed view direction."""
+    return [
+        _fit_camera([points], panel_size, None, fill_fraction=0.84)
+        for points in point_sets
+    ]
+
+
 def select_ours_best_sample(sample_ids, result_root: Path, methods=METHODS) -> dict:
     """Select the Ours RMSE win with the largest margin over second place."""
     requested = set(map(str, sample_ids))
@@ -162,9 +170,7 @@ def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None]
     cmap = matplotlib.colormaps[colormap]
     panel_size = (720, 600)
     camera = _fit_camera([target, *registered], panel_size, None, fill_fraction=0.80)
-    heat_camera = _fit_camera(
-        [apply_transform(partial_source, gt)], panel_size, None, fill_fraction=0.84
-    )
+    heat_cameras = fit_heatmap_cameras(heat_registered, panel_size)
 
     top_images = [render_point_clouds(
         [(points, SOURCE_COLOR), (target, TARGET_COLOR)], camera,
@@ -173,7 +179,7 @@ def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None]
     bottom_images = [render_point_clouds(
         [(points, cmap(norm(error))[:, :3])], heat_camera,
         width=panel_size[0], height=panel_size[1], point_size=3.4, backend="software",
-    ) for points, error in zip(heat_registered, errors)]
+    ) for points, error, heat_camera in zip(heat_registered, errors, heat_cameras)]
 
     fig = plt.figure(figsize=(2.35 * len(LABELS), 7.4), facecolor="white")
     grid = fig.add_gridspec(
@@ -190,13 +196,6 @@ def render_sample(record: SampleRecord, transforms: dict[str, np.ndarray | None]
                       color="crimson" if failed[column] else "black")
         for axis in (top, bottom):
             axis.set_axis_off()
-        error = errors[column]
-        bottom.text(
-            0.5, 0.015, f"[{error.min():.1f}, {error.max():.1f}] mm",
-            transform=bottom.transAxes, ha="center", va="bottom", fontsize=6.5,
-            color="white", bbox={"facecolor": "black", "edgecolor": "none",
-                                 "alpha": 0.68, "pad": 1.2},
-        )
     fig.text(0.007, 0.64, "Registration", rotation=90, va="center", ha="center",
              fontsize=8.5, fontweight="semibold")
     fig.text(0.007, 0.31, "Distance to GT", rotation=90, va="center", ha="center",
