@@ -1,0 +1,194 @@
+{
+  "protocol": {
+    "architecture": "rtor_a3",
+    "dual_encoder": false,
+    "registration_profile": "legacy",
+    "interaction_profile": "cooperative",
+    "neighbor_limits": [
+      7,
+      22,
+      32,
+      39
+    ],
+    "seed": 7351,
+    "validation": "disjoint deformation groups"
+  },
+  "command": [
+    "trainval.py",
+    "--architecture",
+    "rtor_a3",
+    "--interaction_profile",
+    "cooperative",
+    "--max_epoch",
+    "150",
+    "--lr",
+    "1e-4",
+    "--log_steps",
+    "10",
+    "--resume"
+  ],
+  "config": {
+    "seed": 7351,
+    "ablation": {
+      "rtor_enabled": true,
+      "a3_enabled": true,
+      "architecture": "rtor_a3"
+    },
+    "working_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/experiments/geotransformer.p2p_liver",
+    "root_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2",
+    "exp_name": "geotransformer.p2p_liver.rtor_a3_cooperative",
+    "output_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative",
+    "snapshot_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative/snapshots",
+    "log_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative/logs",
+    "event_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative/events",
+    "feature_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative/features",
+    "registration_dir": "/home/yangx/code/new_deform/ai_worker/RTORv2/output/geotransformer.p2p_liver.rtor_a3_cooperative/registration",
+    "data": {
+      "train_root": "/mnt/data3/yangx/P2P/Dataset/Deform_mesh_npz",
+      "train_list": "/mnt/data3/yangx/P2P/Dataset/Deform_mesh_npz/dict.json",
+      "test_root": "/mnt/data3/yangx/P2P/Dataset/Deform_mesh_npz_test/Test",
+      "test_list": "/mnt/data3/yangx/P2P/Dataset/Deform_mesh_npz_test/list.npz",
+      "statistics": "/mnt/data3/yangx/P2P/Dataset/Deform_mesh_npz_test/stat_svd.npz",
+      "in_vitro_root": "/mnt/data3/yangx/P2P/in_vitro",
+      "in_vitro_list": "/mnt/data3/yangx/P2P/in_vitro/rigid_list.npy",
+      "in_vitro_statistics": "/mnt/data3/yangx/P2P/in_vitro/stat.npz",
+      "voxel_size": 0.04,
+      "min_visibility": 0.18,
+      "max_visibility": 1.0,
+      "max_noise_mm": 5.0,
+      "validation_size": 100,
+      "validation_fraction": 0.1,
+      "neighbor_calibration_samples": 2000,
+      "neighbor_limits": null
+    },
+    "train": {
+      "batch_size": 1,
+      "num_workers": 0,
+      "point_limit": null,
+      "use_augmentation": false,
+      "augmentation_noise": 0.005,
+      "augmentation_rotation": 1.0
+    },
+    "test": {
+      "batch_size": 1,
+      "num_workers": 0,
+      "point_limit": null
+    },
+    "eval": {
+      "acceptance_overlap": 0.0,
+      "acceptance_radius": 0.1,
+      "inlier_ratio_threshold": 0.05,
+      "rmse_threshold": 0.2,
+      "rre_threshold": 15.0,
+      "rte_threshold": 0.3
+    },
+    "optim": {
+      "lr": 0.0001,
+      "lr_decay": 0.95,
+      "lr_decay_steps": 1,
+      "weight_decay": 1e-06,
+      "max_epoch": 150,
+      "grad_acc_steps": 1
+    },
+    "backbone": {
+      "num_stages": 4,
+      "init_voxel_size": 0.02,
+      "kernel_size": 15,
+      "base_radius": 2.5,
+      "base_sigma": 2.0,
+      "init_radius": 0.05,
+      "init_sigma": 0.04,
+      "group_norm": 32,
+      "input_dim": 1,
+      "init_dim": 64,
+      "output_dim": 256
+    },
+    "model": {
+      "dual_encoder": false,
+      "ground_truth_matching_radius": 0.04,
+      "num_points_in_patch": 64,
+      "num_sinkhorn_iterations": 100,
+      "registration_profile": "legacy",
+      "interaction_profile": "cooperative"
+    },
+    "coarse_matching": {
+      "num_targets": 128,
+      "overlap_threshold": 0.1,
+      "num_correspondences": 256,
+      "dual_normalization": true,
+      "predicted_ratio_max": 0.25,
+      "exposure_start_epoch": 5,
+      "exposure_end_epoch": 20
+    },
+    "geotransformer": {
+      "input_dim": 1024,
+      "hidden_dim": 256,
+      "output_dim": 256,
+      "num_heads": 4,
+      "blocks": [
+        "self",
+        "cross",
+        "self",
+        "cross",
+        "self",
+        "cross"
+      ],
+      "sigma_d": 0.2,
+      "sigma_a": 15,
+      "angle_k": 3,
+      "reduction_a": "max"
+    },
+    "topology_overlap": {
+      "hidden_dim": 128,
+      "num_neighbors": 8,
+      "poincare_curvature": 1.0,
+      "dropout": 0.1,
+      "score_floor": 0.05,
+      "score_power": 1.0,
+      "positive_overlap": 0.1,
+      "focal_gamma": 2.0,
+      "weight_loss": 0.5
+    },
+    "overlap_selection": {
+      "enabled": false,
+      "threshold": 0.5,
+      "min_superpoints": 16,
+      "max_ratio": 0.5,
+      "min_spread": 0.05
+    },
+    "fine_refiner": {
+      "num_heads": 4,
+      "dropout": 0.0,
+      "geometry_sigma": 0.25,
+      "geometry_weight": 1.0,
+      "residual_init": 0.0
+    },
+    "fine_matching": {
+      "topk": 3,
+      "acceptance_radius": 0.1,
+      "mutual": true,
+      "confidence_threshold": 0.05,
+      "use_dustbin": false,
+      "use_global_score": true,
+      "correspondence_threshold": 3,
+      "correspondence_limit": null,
+      "num_refinement_steps": 5,
+      "robust_refinement_radius": null
+    },
+    "coarse_loss": {
+      "positive_margin": 0.1,
+      "negative_margin": 1.4,
+      "positive_optimal": 0.1,
+      "negative_optimal": 1.4,
+      "log_scale": 24,
+      "positive_overlap": 0.1
+    },
+    "fine_loss": {
+      "positive_radius": 0.04
+    },
+    "loss": {
+      "weight_coarse_loss": 1.0,
+      "weight_fine_loss": 1.0
+    }
+  }
+}
